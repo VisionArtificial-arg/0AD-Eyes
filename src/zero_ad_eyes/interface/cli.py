@@ -14,7 +14,53 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
+from zero_ad_eyes.application.ports import FrameSource, PerceptionModel
 from zero_ad_eyes.infrastructure.model.stub_adapter import StubPerceptionModel
+
+
+def _offline_source(recording: str) -> FrameSource:
+    """A recording is an image folder or a video file — pick the matching source."""
+
+    from zero_ad_eyes.infrastructure.acquisition import ImageFolderSource, VideoFileSource
+
+    path = Path(recording)
+    return ImageFolderSource(path) if path.is_dir() else VideoFileSource(path)
+
+
+def _build_offline_pipeline(recording: str, *, detector: str = "stub") -> PerceptionPipeline:
+    """Wire the real classical chain over a recording (EPIC A→G integration).
+
+    Everything except the detection *model* is a real classical adapter: offline
+    source, preprocessing, HUD calibration + reader, minimap reader, IoU tracker,
+    and the classical entity enricher (ownership/health/state). The model seam stays
+    plugged with the stub (🔌) by default so the learned detector remains the only
+    thing to swap in at MP4; ``--detector classical`` opts into the classical
+    detection baseline (E6a) meanwhile.
+    """
+
+    from zero_ad_eyes.infrastructure.calibration import HudCalibrator
+    from zero_ad_eyes.infrastructure.hud.reader import ClassicalHudReader
+    from zero_ad_eyes.infrastructure.minimap.reader import ClassicalMinimapReader
+    from zero_ad_eyes.infrastructure.perception import (
+        ClassicalEntityEnricher,
+        ClassicalPerceptionModel,
+    )
+    from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
+    from zero_ad_eyes.infrastructure.tracking.tracker import IouTracker
+
+    model: PerceptionModel = (
+        ClassicalPerceptionModel() if detector == "classical" else StubPerceptionModel()
+    )
+    return PerceptionPipeline(
+        _offline_source(recording),
+        model,
+        preprocessor=PreprocessingPipeline(),
+        calibrator=HudCalibrator(),
+        hud_reader=ClassicalHudReader(),
+        minimap_reader=ClassicalMinimapReader(),
+        tracker=IouTracker(),
+        enricher=ClassicalEntityEnricher(),
+    )
 
 
 def _synthetic_source(n_frames: int, width: int, height: int) -> object:
@@ -87,6 +133,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     run.add_argument("--frames", type=int, default=3)
     run.add_argument("--width", type=int, default=1280)
     run.add_argument("--height", type=int, default=720)
+    run.add_argument(
+        "--recording",
+        default=None,
+        help="path to a recording (image folder or video); drives the real classical chain",
+    )
+    run.add_argument(
+        "--detector",
+        choices=("stub", "classical"),
+        default="stub",
+        help="detection source for --recording; stub keeps the model seam plugged (default)",
+    )
 
     ev = sub.add_parser("eval", help="run the ML8 accuracy harness (NF3 metrics)")
     ev.add_argument("--dataset", default=None, help="JSON with {predicted, truth} world models")
@@ -94,8 +151,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "run":
-        source = _synthetic_source(args.frames, args.width, args.height)
-        pipeline = PerceptionPipeline(source, StubPerceptionModel())  # type: ignore[arg-type]
+        if args.recording is not None:
+            pipeline = _build_offline_pipeline(args.recording, detector=args.detector)
+        else:
+            source = _synthetic_source(args.frames, args.width, args.height)
+            pipeline = PerceptionPipeline(source, StubPerceptionModel())  # type: ignore[arg-type]
         for world_model in pipeline.run():
             print(world_model.model_dump_json())
         return 0
