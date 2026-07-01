@@ -78,6 +78,18 @@ class Tracker(Protocol):
 
 
 @runtime_checkable
+class EntityEnricher(Protocol):
+    """EPIC E — attaches per-entity attributes (ownership E3, health E4, state E5).
+
+    Runs *after* tracking, reading each entity's crop from the frame to fill
+    attributes the detector/tracker left absent. Fill-if-absent by contract: an
+    enricher must not clobber a value a more authoritative source already set.
+    """
+
+    def enrich(self, entities: tuple[Entity, ...], frame: Frame) -> tuple[Entity, ...]: ...
+
+
+@runtime_checkable
 class WorldModelSink(Protocol):
     """EPIC H — receives each published world model (the decision-layer boundary)."""
 

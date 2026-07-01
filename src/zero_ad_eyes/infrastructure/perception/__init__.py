@@ -12,6 +12,7 @@ nothing here ever produces ``Provenance.LEARNED``.
 
 from __future__ import annotations
 
+from .enrichment import ClassicalEntityEnricher
 from .health import locate_health_bar, measure_fill, read_health
 from .masks import (
     Component,
@@ -46,6 +47,7 @@ from .templates import (
 __all__ = [
     "DEFAULT_PALETTE",
     "DEFAULT_RESOURCE_CUES",
+    "ClassicalEntityEnricher",
     "ClassicalPerceptionModel",
     "Component",
     "HsvBand",

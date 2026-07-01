@@ -17,6 +17,7 @@ from zero_ad_eyes.domain.world_model import WorldModel
 from .frames import Frame
 from .ports import (
     Calibrator,
+    EntityEnricher,
     FrameSource,
     HudReader,
     MinimapReader,
@@ -40,6 +41,7 @@ class PerceptionPipeline:
         hud_reader: HudReader | None = None,
         minimap_reader: MinimapReader | None = None,
         tracker: Tracker | None = None,
+        enricher: EntityEnricher | None = None,
         sink: WorldModelSink | None = None,
     ) -> None:
         self._source = source
@@ -49,6 +51,7 @@ class PerceptionPipeline:
         self._hud_reader = hud_reader
         self._minimap_reader = minimap_reader
         self._tracker = tracker
+        self._enricher = enricher
         self._sink = sink
 
     def run(self) -> Iterator[WorldModel]:
@@ -79,6 +82,8 @@ class PerceptionPipeline:
 
         detections = self._model.infer(frame)
         entities = self._tracker.update(detections, frame) if self._tracker else ()
+        if self._enricher is not None:
+            entities = self._enricher.enrich(entities, frame)
 
         return WorldModel(
             meta=frame.meta,
