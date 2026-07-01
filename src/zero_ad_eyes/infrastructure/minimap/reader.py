@@ -20,6 +20,8 @@ from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.minimap import FogGrid as DomainFogGrid
 from zero_ad_eyes.domain.minimap import MinimapModel
+from zero_ad_eyes.domain.minimap import TerritoryMap as DomainTerritoryMap
+from zero_ad_eyes.domain.minimap import TerritoryRegion as DomainTerritoryRegion
 
 from .blips import BlipDetector
 from .fog import FogClassifier, FogGrid
@@ -60,11 +62,15 @@ class ClassicalMinimapReader:
         blips = self._blip_detector.detect(segmentation, projector)
         viewport = self._viewport_detector.detect(segmentation, projector)
         fog = self._domain_fog(self._fog_classifier.classify(segmentation))
+        territory = self._domain_territory(
+            self._territory_extractor.extract(segmentation, projector), segmentation
+        )
 
         return MinimapModel(
             blips=blips,
             viewport=viewport,
             fog=fog,
+            territory=territory,
             confidence=Confidence(value=self._region_confidence, provenance=Provenance.CLASSICAL),
         )
 
@@ -73,6 +79,28 @@ class ClassicalMinimapReader:
         """v0.2: the classifier's grid mapped onto the domain contract (same cells)."""
 
         return DomainFogGrid(rows=grid.rows, cols=grid.cols, cells=grid.cells)
+
+    @staticmethod
+    def _domain_territory(
+        territory: TerritoryMap, segmentation: Segmentation
+    ) -> DomainTerritoryMap:
+        """v0.2: infra regions → domain contract.
+
+        The domain region carries a world-space centroid and a *coverage* fraction
+        (region pixels over the whole minimap area); the infra border mask is a
+        rendering detail and is dropped. An empty map is a valid "no territory yet".
+        """
+
+        total = float(segmentation.width * segmentation.height) or 1.0
+        regions = tuple(
+            DomainTerritoryRegion(
+                ownership=region.ownership,
+                centroid=region.world_center,
+                coverage=min(1.0, region.area / total),
+            )
+            for region in territory.regions
+        )
+        return DomainTerritoryMap(regions=regions)
 
     def read_territory(self, frame: Frame, calibration: Calibration) -> TerritoryMap | None:
         """D3 side-channel: territory/border regions (not part of ``MinimapModel``)."""

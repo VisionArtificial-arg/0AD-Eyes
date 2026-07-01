@@ -52,6 +52,21 @@ def test_read_populates_domain_fog_when_region_present() -> None:
     assert model.fog.rows * model.fog.cols == len(model.fog.cells) * len(model.fog.cells[0])
 
 
+def test_read_populates_domain_territory_when_region_present() -> None:
+    image = np.zeros((200, 300, 3), dtype=np.uint8)
+    image[150:198, 10:58] = 220
+    calibration = Calibration(
+        width=300, height=200, minimap=ScreenBBox(x=10, y=150, width=48, height=48)
+    )
+
+    model = ClassicalMinimapReader().read(_frame(image), calibration)
+
+    # An empty territory map is valid; the contract is that the field is populated
+    # (not None) whenever the minimap is calibrated, with coverage in [0, 1].
+    assert model.territory is not None
+    assert all(0.0 <= region.coverage <= 1.0 for region in model.territory.regions)
+
+
 def test_returns_unknown_when_no_minimap_calibrated() -> None:
     image = np.zeros((200, 300, 3), dtype=np.uint8)
     calibration = Calibration(width=300, height=200, minimap=None)
