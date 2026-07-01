@@ -45,6 +45,40 @@ def test_reads_type_health_and_queue() -> None:
     assert sel.confidence.provenance is Provenance.CLASSICAL
 
 
+def test_read_folds_selection_into_hudstate_as_domain_value() -> None:
+    # v0.2: the port's read() carries selection on HudState, health as a fraction.
+    layout = SelectionPanelLayout()
+    frame, ocr = build_hud(
+        _PANEL,
+        [(layout.entity_type, "Spearman"), (layout.health, "45/100")],
+        width=200,
+        height=80,
+    )
+    reader = ClassicalHudReader(ocr, selection_layout=layout)
+    calibration = Calibration(
+        width=200,
+        height=80,
+        top_bar=ScreenBBox(x=0, y=0, width=200, height=24),
+        selection_panel=_PANEL,
+    )
+
+    hud = reader.read(frame, calibration)
+
+    assert hud.selection is not None
+    assert hud.selection.entity_type == "Spearman"
+    assert hud.selection.health == 0.45  # domain contract: fraction, not raw HP
+
+
+def test_read_without_selection_leaves_hudstate_selection_none() -> None:
+    frame, ocr = build_hud(_PANEL, [], width=200, height=80)
+    reader = ClassicalHudReader(ocr)
+    calibration = Calibration(
+        width=200, height=80, top_bar=ScreenBBox(x=0, y=0, width=200, height=24)
+    )
+
+    assert reader.read(frame, calibration).selection is None
+
+
 def test_empty_selection_is_unknown() -> None:
     frame, ocr = build_hud(_PANEL, [], width=200, height=80)
     reader = ClassicalHudReader(ocr)

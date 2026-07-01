@@ -17,6 +17,7 @@ from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.geometry import ScreenBBox
 from zero_ad_eyes.domain.hud import HudState, Population
+from zero_ad_eyes.domain.hud import SelectionState as DomainSelectionState
 from zero_ad_eyes.domain.taxonomy import Phase, ResourceType
 
 from .cropping import crop, sample_color_rgb
@@ -77,7 +78,29 @@ class ClassicalHudReader:
             phase=phase,
             self_player_color=self_color,
             self_civ=self_civ,
+            selection=self._selection_domain(frame, calibration),
             confidence=Confidence(value=read / attempted, provenance=Provenance.CLASSICAL),
+        )
+
+    def _selection_domain(
+        self, frame: Frame, calibration: Calibration
+    ) -> DomainSelectionState | None:
+        """v0.2: fold the selection-panel read into ``HudState.selection``.
+
+        Maps the reader's local reading onto the domain value object: health is
+        emitted as a fraction (the domain contract), not raw hit points. Returns
+        ``None`` when nothing is selected (or the panel is uncalibrated) so a bare
+        HUD carries no phantom selection.
+        """
+
+        reading = self.read_selection(frame, calibration)
+        if reading.entity_type is None and reading.health is None and not reading.production_queue:
+            return None
+        return DomainSelectionState(
+            entity_type=reading.entity_type,
+            health=reading.health.fraction if reading.health is not None else None,
+            production_queue=reading.production_queue,
+            confidence=reading.confidence,
         )
 
     def read_selection(self, frame: Frame, calibration: Calibration) -> SelectionState:
