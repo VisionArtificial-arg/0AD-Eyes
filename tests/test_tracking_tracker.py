@@ -66,6 +66,18 @@ def test_new_detection_births_a_new_id() -> None:
     assert {e.entity_id for e in entities} == {0, 1}
 
 
+def test_motion_is_none_on_first_sighting_then_populated() -> None:
+    tracker = IouTracker()
+    (first,) = tracker.update(_dets(0, _det(0, 0)), make_frame(0))
+    assert first.motion is None  # one observation → velocity unknown, not fabricated
+
+    (second,) = tracker.update(_dets(1, _det(3, 0)), make_frame(1))  # moved +3 in x
+    assert second.motion is not None
+    assert second.motion.dx == 3.0
+    assert second.motion.dy == 0.0
+    assert second.motion.confidence.provenance is Provenance.CLASSICAL
+
+
 def test_confidence_and_type_carry_through() -> None:
     tracker = IouTracker()
     (entity,) = tracker.update(_dets(0, _det(0, 0, kind=EntityKind.BUILDING)), make_frame(0))

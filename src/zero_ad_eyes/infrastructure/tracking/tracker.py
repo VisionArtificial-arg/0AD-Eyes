@@ -16,8 +16,10 @@ out. Motion (G6), stabilisation (G7) and events (G8) extend this same adapter.
 from __future__ import annotations
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.detections import Detection, Detections
 from zero_ad_eyes.domain.entities import Entity
+from zero_ad_eyes.domain.motion import Motion as EntityMotion
 
 from .association import greedy_match
 from .motion import Motion, motion_from_trajectory
@@ -68,7 +70,27 @@ class IouTracker:
         ]
         self._tracks = survivors + spawned
 
-        return tuple(t.to_entity() for t in self._tracks)
+        return tuple(self._emit(t) for t in self._tracks)
+
+    def _emit(self, track: Track) -> Entity:
+        """Build the entity and attach its v0.2 motion estimate (G6) when known.
+
+        Motion is derived deterministically from the track's own trajectory, so it
+        is a ``CLASSICAL`` fact and only as sure as the entity it belongs to. A track
+        with fewer than two observations has no velocity yet — motion stays ``None``
+        (honest "unknown"), never a fabricated "still".
+        """
+
+        entity = track.to_entity()
+        if len(track.trajectory) < 2:
+            return entity
+        velocity = motion_from_trajectory(track.trajectory)
+        motion = EntityMotion(
+            dx=velocity.dx,
+            dy=velocity.dy,
+            confidence=Confidence(value=entity.confidence.value, provenance=Provenance.CLASSICAL),
+        )
+        return entity.model_copy(update={"motion": motion})
 
     def statuses(self) -> dict[int, TrackStatus]:
         """Observability (NF6): current lifecycle status keyed by entity id."""
