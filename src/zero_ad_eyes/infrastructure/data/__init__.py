@@ -18,3 +18,33 @@ port and the frame carrier). It is **never linked into the inference path** — 
 production pipeline reads pixels only (D1/D6). The ground-truth pieces in particular
 consume engine-derived state, which is authoritative *for training/eval only*.
 """
+
+from __future__ import annotations
+
+from .annotation import AnnotationSet, FrameAnnotation
+from .dataset_collection import CaptureManifest, DatasetCollector
+from .evaluation import (
+    EvalConfig,
+    EvaluationReport,
+    MetricResult,
+    MetricStatus,
+    evaluate,
+    mean_average_precision,
+)
+from .ground_truth import AlignedGroundTruth, EngineStateExport, GroundTruthAligner
+
+__all__ = [
+    "AlignedGroundTruth",
+    "AnnotationSet",
+    "CaptureManifest",
+    "DatasetCollector",
+    "EngineStateExport",
+    "EvalConfig",
+    "EvaluationReport",
+    "FrameAnnotation",
+    "GroundTruthAligner",
+    "MetricResult",
+    "MetricStatus",
+    "evaluate",
+    "mean_average_precision",
+]
