@@ -29,6 +29,22 @@ def test_roi_crop_reduces_shape() -> None:
     assert out.meta == frame.meta  # meta preserved as capture provenance
 
 
+def test_roi_crop_records_and_accumulates_offset() -> None:
+    # v0.2: CROP shifts the origin, so crop_offset tracks where the sub-image sits.
+    frame = make_pattern_frame()
+    once = RoiGate(ScreenBBox(x=6.0, y=4.0, width=14.0, height=8.0), mode=GateMode.CROP)(frame)
+    assert once.crop_offset == (6, 4)
+
+    twice = RoiGate(ScreenBBox(x=2.0, y=1.0, width=5.0, height=4.0), mode=GateMode.CROP)(once)
+    assert twice.crop_offset == (8, 5)  # offsets compose through nested crops
+
+
+def test_roi_mask_leaves_offset_untouched() -> None:
+    frame = make_pattern_frame()
+    out = RoiGate(ScreenBBox(x=6.0, y=4.0, width=14.0, height=8.0), mode=GateMode.MASK)(frame)
+    assert out.crop_offset == (0, 0)
+
+
 def test_roi_clamps_to_frame_bounds() -> None:
     frame = make_pattern_frame()
     bbox = ScreenBBox(x=0.0, y=0.0, width=1000.0, height=1000.0)

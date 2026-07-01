@@ -17,10 +17,12 @@ Two modes make an explicit trade-off:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from enum import Enum
 
 import numpy as np
 
+from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.domain.geometry import ScreenBBox
 
 from .base import Image, ImageStep
@@ -68,3 +70,21 @@ class RoiGate(ImageStep):
         gated = np.zeros_like(image)
         gated[y0:y1, x0:x1] = image[y0:y1, x0:x1]
         return gated
+
+    def __call__(self, frame: Frame) -> Frame:
+        """Apply the gate, recording the crop origin on the frame (v0.2).
+
+        CROP shifts the coordinate origin to the ROI's top-left, so the frame's
+        ``crop_offset`` accumulates ``(x0, y0)`` — the remaining record of where the
+        sub-image sits in the original capture, letting downstream map ROI-local
+        detections back. MASK keeps capture-resolution coordinates, so the offset is
+        untouched.
+        """
+
+        new_image = self.transform(frame.image)
+        if self._mode != GateMode.CROP:
+            return replace(frame, image=new_image)
+        height, width = frame.image.shape[:2]
+        y0, _, x0, _ = _pixel_bounds(self._bbox, height, width)
+        offset_x, offset_y = frame.crop_offset
+        return replace(frame, image=new_image, crop_offset=(offset_x + x0, offset_y + y0))
