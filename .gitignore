@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environments
+.venv/
+venv/
+
+# Build
+dist/
+build/
+
+# Models / data artifacts (delivered separately, not versioned here)
+*.onnx
+*.pt
+*.pth
+/data/
+/recordings/
+
+# OS / editor
+.DS_Store
+*.swp

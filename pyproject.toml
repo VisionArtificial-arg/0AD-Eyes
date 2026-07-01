@@ -1,0 +1,54 @@
+[project]
+name = "zero-ad-eyes"
+version = "0.0.1"
+description = "0AD-Eyes — pure-pixel computer-vision perception layer for a 0 A.D. autonomous player."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python>=4.9",
+    "mss>=9.0",
+    "pytesseract>=0.3.10",
+    "pydantic>=2.6",
+]
+
+[project.scripts]
+zero-ad-eyes = "zero_ad_eyes.interface.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zero_ad_eyes"]
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+# NOTE: indent-width defaults to 4 (idiomatic Python / ruff default). The global
+# 8-space preference conflicts with the Python toolchain; flip to `indent-width = 8`
+# here + `just fmt` to adopt it project-wide if desired.
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
