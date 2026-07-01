@@ -23,7 +23,10 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
+from zero_ad_eyes.domain.events import Event
+from zero_ad_eyes.domain.events import EventKind as DomainEventKind
 from zero_ad_eyes.domain.taxonomy import EntityKind
 
 
@@ -117,3 +120,42 @@ class EventDetector:
         return TrackingEvent(
             kind=kind, entity_id=entity.entity_id, frame_id=frame_id, detail=detail
         )
+
+
+_DOMAIN_KIND: dict[EventKind, DomainEventKind] = {
+    EventKind.APPEARED: DomainEventKind.UNIT_APPEARED,
+    EventKind.DISAPPEARED: DomainEventKind.UNIT_DISAPPEARED,
+    EventKind.COMBAT: DomainEventKind.COMBAT,
+    EventKind.DEPLETED: DomainEventKind.RESOURCE_DEPLETED,
+    EventKind.STATE_CHANGED: DomainEventKind.STATE_CHANGED,
+}
+
+
+class ClassicalEventDetector:
+    """``EventSource`` adapter: wraps :class:`EventDetector`, mapping to domain events.
+
+    The transition is inferred deterministically from the entity contract, so it is
+    ``CLASSICAL``; its sureness inherits the current entity's confidence value where
+    the entity is still present (appear/combat/state-change), and is taken as certain
+    for a disappearance (the id definitively left the tracked set). The infra event's
+    ``detail`` string is a debug aid and is dropped from the domain contract.
+    """
+
+    def __init__(self, detector: EventDetector | None = None) -> None:
+        self._detector = detector if detector is not None else EventDetector()
+
+    def detect(self, entities: Sequence[Entity], frame_id: int) -> tuple[Event, ...]:
+        by_id = {entity.entity_id: entity for entity in entities}
+        events: list[Event] = []
+        for raw in self._detector.detect(entities, frame_id):
+            source = by_id.get(raw.entity_id)
+            value = source.confidence.value if source is not None else 1.0
+            events.append(
+                Event(
+                    kind=_DOMAIN_KIND[raw.kind],
+                    frame_id=raw.frame_id,
+                    entity_id=raw.entity_id,
+                    confidence=Confidence(value=value, provenance=Provenance.CLASSICAL),
+                )
+            )
+        return tuple(events)

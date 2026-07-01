@@ -83,3 +83,18 @@ def test_events_are_deterministically_ordered() -> None:
         (1, EventKind.APPEARED),
         (2, EventKind.DISAPPEARED),
     ]
+
+
+def test_classical_adapter_maps_to_domain_events() -> None:
+    from zero_ad_eyes.domain.events import EventKind as DomainEventKind
+    from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
+
+    adapter = ClassicalEventDetector()
+
+    born = adapter.detect((_entity(0),), frame_id=0)
+    assert [e.kind for e in born] == [DomainEventKind.UNIT_APPEARED]
+    assert born[0].entity_id == 0
+    assert born[0].confidence.provenance is Provenance.CLASSICAL
+
+    gone = adapter.detect((), frame_id=1)
+    assert [e.kind for e in gone] == [DomainEventKind.UNIT_DISAPPEARED]

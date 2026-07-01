@@ -16,6 +16,7 @@ from typing import Protocol, runtime_checkable
 from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.detections import Detections
 from zero_ad_eyes.domain.entities import Entity
+from zero_ad_eyes.domain.events import Event
 from zero_ad_eyes.domain.geometry import ScreenBBox
 from zero_ad_eyes.domain.hud import HudState
 from zero_ad_eyes.domain.minimap import MinimapModel
@@ -87,6 +88,17 @@ class EntityEnricher(Protocol):
     """
 
     def enrich(self, entities: tuple[Entity, ...], frame: Frame) -> tuple[Entity, ...]: ...
+
+
+@runtime_checkable
+class EventSource(Protocol):
+    """EPIC G/G8 — derives discrete world events from frame-over-frame entity changes.
+
+    Stateful across calls (it diffs against the previous frame), returning the
+    domain events for *this* frame. Reads only the ``Entity`` contract, never pixels.
+    """
+
+    def detect(self, entities: tuple[Entity, ...], frame_id: int) -> tuple[Event, ...]: ...
 
 
 @runtime_checkable

@@ -46,7 +46,7 @@ def _build_offline_pipeline(recording: str, *, detector: str = "stub") -> Percep
         ClassicalPerceptionModel,
     )
     from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
-    from zero_ad_eyes.infrastructure.tracking.tracker import IouTracker
+    from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector, IouTracker
 
     model: PerceptionModel = (
         ClassicalPerceptionModel() if detector == "classical" else StubPerceptionModel()
@@ -60,6 +60,7 @@ def _build_offline_pipeline(recording: str, *, detector: str = "stub") -> Percep
         minimap_reader=ClassicalMinimapReader(),
         tracker=IouTracker(),
         enricher=ClassicalEntityEnricher(),
+        event_detector=ClassicalEventDetector(),
     )
 
 
