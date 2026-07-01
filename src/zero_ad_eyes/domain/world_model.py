@@ -10,10 +10,11 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from .entities import Entity
+from .events import Event
 from .hud import HudState
 from .minimap import MinimapModel
 
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
 
 
 class FrameMeta(BaseModel):
@@ -38,3 +39,4 @@ class WorldModel(BaseModel):
     hud: HudState | None = None
     minimap: MinimapModel | None = None
     entities: tuple[Entity, ...] = ()
+    events: tuple[Event, ...] = ()  # v0.2: inter-frame transitions (EPIC G)

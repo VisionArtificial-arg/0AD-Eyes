@@ -25,3 +25,4 @@ class Frame:
 
     image: Any
     meta: FrameMeta
+    crop_offset: tuple[int, int] = (0, 0)  # v0.2: (x, y) of this crop in the full capture

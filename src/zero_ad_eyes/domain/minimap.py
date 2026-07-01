@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .confidence import Confidence
 from .geometry import WorldPoint
@@ -43,9 +43,44 @@ class ViewportRect(BaseModel):
     bottom_right: WorldPoint
 
 
+class FogGrid(BaseModel):
+    """Coarse fog-of-war raster read off the minimap (v0.2, CV-30).
+
+    ``cells`` is row-major (``cells[row][col]``); ``rows``/``cols`` state the
+    intended shape so an empty grid still declares its resolution. Kept coarse on
+    purpose — the decision layer wants "is this region scouted", not a per-pixel mask.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    rows: int = Field(ge=0)
+    cols: int = Field(ge=0)
+    cells: tuple[tuple[FogState, ...], ...] = ()
+
+
+class TerritoryRegion(BaseModel):
+    """A contiguous area of map influence attributed to one owner (v0.2)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    ownership: Ownership
+    centroid: WorldPoint
+    coverage: float = Field(ge=0.0, le=1.0)  # fraction of the map area
+
+
+class TerritoryMap(BaseModel):
+    """Territory ownership decomposition of the minimap (v0.2)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    regions: tuple[TerritoryRegion, ...] = ()
+
+
 class MinimapModel(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     blips: tuple[Blip, ...] = ()
     viewport: ViewportRect | None = None
+    fog: FogGrid | None = None
+    territory: TerritoryMap | None = None
     confidence: Confidence = Confidence.unknown()

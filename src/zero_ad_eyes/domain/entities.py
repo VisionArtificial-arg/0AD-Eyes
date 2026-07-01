@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .confidence import Confidence
 from .geometry import ScreenBBox, WorldPoint
+from .motion import Motion
 from .taxonomy import EntityKind, Ownership
 
 
@@ -26,5 +27,6 @@ class Entity(BaseModel):
     screen_bbox: ScreenBBox | None = None
     health: float | None = Field(default=None, ge=0.0, le=1.0)
     selected: bool = False
+    motion: Motion | None = None  # v0.2: estimated velocity (EPIC G)
     staleness: int = Field(default=0, ge=0)  # frames since last observed
     confidence: Confidence = Confidence.unknown()

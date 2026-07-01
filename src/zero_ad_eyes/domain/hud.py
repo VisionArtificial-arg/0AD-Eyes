@@ -19,6 +19,23 @@ class Population(BaseModel):
     cap: int = Field(ge=0)
 
 
+class SelectionState(BaseModel):
+    """The currently-selected unit/building panel (v0.2, §4.2 / EPIC E).
+
+    Own-POV: this is whatever the *self* player has selected. All fields optional
+    because the panel is only populated when something is selected and each datum
+    (health bar, production queue, garrison count) is read independently.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    entity_type: str | None = None
+    health: float | None = Field(default=None, ge=0.0, le=1.0)
+    production_queue: tuple[str, ...] = ()
+    garrison: int | None = Field(default=None, ge=0)
+    confidence: Confidence = Confidence.unknown()
+
+
 class HudState(BaseModel):
     """Parsed top-bar / self-identification state."""
 
@@ -29,4 +46,5 @@ class HudState(BaseModel):
     phase: Phase = Phase.UNKNOWN
     self_player_color: tuple[int, int, int] | None = None  # RGB, self-identification
     self_civ: str | None = None
+    selection: SelectionState | None = None
     confidence: Confidence = Confidence.unknown()
