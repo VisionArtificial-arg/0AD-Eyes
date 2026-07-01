@@ -19,7 +19,9 @@ from collections.abc import Sequence
 
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
+from zero_ad_eyes.domain.geometry import WorldPoint
 from zero_ad_eyes.domain.taxonomy import Ownership
+from zero_ad_eyes.infrastructure.geometry.fusion import reconcile
 
 
 def _position(entity: Entity) -> tuple[float, float] | None:
@@ -38,14 +40,38 @@ def _sq_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
     return dx * dx + dy * dy
 
 
+def _fuse_world_pos(higher: Entity, lower: Entity) -> WorldPoint | None:
+    """Fuse the two world positions (the one spatial attribute).
+
+    When both sources carry a position, delegate the blend to the F3 geometry
+    reconciler (:func:`geometry.fusion.reconcile`) — G5 is the single home for
+    fusion and treats the two-estimate spatial case as F3's pure-geometry special
+    case, rather than winner-take-all. Only the reconciled *point* is used here; the
+    entity's overall confidence stays the winner's value (attribute-level G5 policy,
+    below). When only one source has a position, backfill from whichever has it.
+
+    Eventual target: inverse-variance weighting once each source exposes a position
+    covariance; ``reconcile``'s confidence-weighted mean is the documented heuristic
+    until then (REQUIREMENTS.md G5).
+    """
+
+    if higher.world_pos is not None and lower.world_pos is not None:
+        fused_point, _ = reconcile(
+            higher.world_pos, higher.confidence, lower.world_pos, lower.confidence
+        )
+        return fused_point
+    return higher.world_pos if higher.world_pos is not None else lower.world_pos
+
+
 def resolve_conflict(primary: Entity, secondary: Entity) -> Entity:
     """Confidence-weighted merge of two entities held to be the same thing (G5).
 
     Each attribute is taken from the more-confident source, falling back to the
-    other when the winner's value is missing/unknown. The persistent ``entity_id``
-    is always the primary's (the tracked identity); ``staleness`` takes the freshest
-    (minimum) of the two; the fused confidence keeps the winning value but is
-    re-tagged ``FUSED``.
+    other when the winner's value is missing/unknown — except the world position,
+    which is *blended* via the F3 reconciler (see :func:`_fuse_world_pos`). The
+    persistent ``entity_id`` is always the primary's (the tracked identity);
+    ``staleness`` takes the freshest (minimum) of the two; the fused confidence keeps
+    the winning value but is re-tagged ``FUSED``.
     """
 
     higher, lower = (
@@ -60,7 +86,7 @@ def resolve_conflict(primary: Entity, secondary: Entity) -> Entity:
         kind=higher.kind,
         ownership=ownership,
         entity_type=higher.entity_type if higher.entity_type is not None else lower.entity_type,
-        world_pos=higher.world_pos if higher.world_pos is not None else lower.world_pos,
+        world_pos=_fuse_world_pos(higher, lower),
         screen_bbox=higher.screen_bbox if higher.screen_bbox is not None else lower.screen_bbox,
         health=higher.health if higher.health is not None else lower.health,
         selected=higher.selected or lower.selected,

@@ -53,6 +53,23 @@ def test_resolve_conflict_backfills_from_lower_confidence_when_winner_unknown() 
     assert merged.confidence.value == 0.9
 
 
+def test_resolve_conflict_blends_world_pos_via_geometry_reconciler() -> None:
+    # G5 delegates the spatial attribute to the F3 reconciler: the fused position is
+    # the confidence-weighted blend of both, not the winner's coordinate.
+    primary = _entity(0, x=0.0, y=0.0, value=0.4)
+    secondary = _entity(9, x=10.0, y=0.0, value=0.9)
+
+    merged = resolve_conflict(primary, secondary)
+
+    assert merged.world_pos is not None
+    # blended toward the more-confident source (10.0) but strictly between the two
+    assert 0.0 < merged.world_pos.x < 10.0
+    assert merged.world_pos.x > 5.0
+    # entity confidence stays winner-take-all (attribute policy), only re-tagged
+    assert merged.confidence.value == 0.9
+    assert merged.confidence.provenance is Provenance.FUSED
+
+
 def test_fuse_matches_nearby_hint_and_keeps_faraway_hint_separate() -> None:
     primary = (_entity(0, x=0.0, y=0.0, value=0.5, ownership=Ownership.UNKNOWN),)
     hints = (
