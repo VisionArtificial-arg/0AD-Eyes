@@ -18,6 +18,7 @@ from __future__ import annotations
 from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
+from zero_ad_eyes.domain.minimap import FogGrid as DomainFogGrid
 from zero_ad_eyes.domain.minimap import MinimapModel
 
 from .blips import BlipDetector
@@ -58,12 +59,20 @@ class ClassicalMinimapReader:
         projector = self._projector(segmentation)
         blips = self._blip_detector.detect(segmentation, projector)
         viewport = self._viewport_detector.detect(segmentation, projector)
+        fog = self._domain_fog(self._fog_classifier.classify(segmentation))
 
         return MinimapModel(
             blips=blips,
             viewport=viewport,
+            fog=fog,
             confidence=Confidence(value=self._region_confidence, provenance=Provenance.CLASSICAL),
         )
+
+    @staticmethod
+    def _domain_fog(grid: FogGrid) -> DomainFogGrid:
+        """v0.2: the classifier's grid mapped onto the domain contract (same cells)."""
+
+        return DomainFogGrid(rows=grid.rows, cols=grid.cols, cells=grid.cells)
 
     def read_territory(self, frame: Frame, calibration: Calibration) -> TerritoryMap | None:
         """D3 side-channel: territory/border regions (not part of ``MinimapModel``)."""

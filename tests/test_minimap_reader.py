@@ -39,6 +39,19 @@ def test_returns_classical_model_when_region_present() -> None:
     assert model.confidence.value > 0.0
 
 
+def test_read_populates_domain_fog_when_region_present() -> None:
+    image = np.zeros((200, 300, 3), dtype=np.uint8)
+    image[150:198, 10:58] = 220  # a bright (fully-visible) minimap crop
+    calibration = Calibration(
+        width=300, height=200, minimap=ScreenBBox(x=10, y=150, width=48, height=48)
+    )
+
+    model = ClassicalMinimapReader().read(_frame(image), calibration)
+
+    assert model.fog is not None
+    assert model.fog.rows * model.fog.cols == len(model.fog.cells) * len(model.fog.cells[0])
+
+
 def test_returns_unknown_when_no_minimap_calibrated() -> None:
     image = np.zeros((200, 300, 3), dtype=np.uint8)
     calibration = Calibration(width=300, height=200, minimap=None)
