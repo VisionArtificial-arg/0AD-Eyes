@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Full gate before code leaves your machine: check + test + eval.
+exec just validate

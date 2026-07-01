@@ -21,6 +21,9 @@ build/
 /data/
 /recordings/
 
+# Agent worktrees
+.claude/worktrees/
+
 # OS / editor
 .DS_Store
 *.swp

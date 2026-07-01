@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fast local gate: lint + format-check + type-check. Full validate runs on pre-push.
+exec just check

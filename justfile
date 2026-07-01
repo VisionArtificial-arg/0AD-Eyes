@@ -4,6 +4,12 @@ set shell := ["bash", "-cu"]
 default:
     @just --list
 
+# One-time local setup: activate committed git hooks + sync the locked env.
+# pre-commit runs `just check`; pre-push runs `just validate`.
+setup:
+    git config core.hooksPath hooks
+    uv sync
+
 # Static gates: lint + format-check + type-check (fast, no game needed)
 check:
     uv run ruff check .
