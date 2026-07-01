@@ -6,7 +6,7 @@ package, not the module layout.
 
 from __future__ import annotations
 
-from .config import (
+from zero_ad_eyes.application.settings import (
     RGB,
     Config,
     FogPalette,
@@ -14,9 +14,9 @@ from .config import (
     OwnerPalette,
     Paths,
     Thresholds,
-    load_config,
-    save_config,
 )
+
+from .config import load_config, save_config
 
 __all__ = [
     "RGB",

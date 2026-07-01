@@ -23,10 +23,10 @@ from collections.abc import Sequence
 from typing import Any
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import OverlaySettings
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.minimap import Blip, FogState, MinimapModel
 from zero_ad_eyes.domain.world_model import WorldModel
-from zero_ad_eyes.infrastructure.config import OverlaySettings
 
 # A fog grid is a row-major 2-D grid of visibility states (§4.5). Kept as a plain
 # nested sequence so the overlay does not force a numpy shape on its callers.
