@@ -118,8 +118,12 @@ class Thresholds(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-class OwnershipHsvBand(BaseModel):
-    """An inclusive HSV window (OpenCV ranges: H 0-179, S/V 0-255) — pure data."""
+class HsvWindow(BaseModel):
+    """A generic inclusive HSV window (OpenCV ranges: H 0-179, S/V 0-255) — pure data.
+
+    Shared by the ownership palette (E3) and the resource cues (E6a); infrastructure
+    rehydrates it into its cv2-capable ``HsvBand`` at the boundary.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -138,7 +142,7 @@ class OwnershipColor(BaseModel):
 
     name: str
     ownership: Ownership
-    bands: tuple[OwnershipHsvBand, ...]
+    bands: tuple[HsvWindow, ...]
 
 
 def _default_ownership_colors() -> tuple[OwnershipColor, ...]:
@@ -150,18 +154,18 @@ def _default_ownership_colors() -> tuple[OwnershipColor, ...]:
 
     return (
         OwnershipColor(
-            name="blue", ownership=Ownership.SELF, bands=(OwnershipHsvBand(h_lo=100, h_hi=130),)
+            name="blue", ownership=Ownership.SELF, bands=(HsvWindow(h_lo=100, h_hi=130),)
         ),
         OwnershipColor(
-            name="green", ownership=Ownership.ALLY, bands=(OwnershipHsvBand(h_lo=45, h_hi=85),)
+            name="green", ownership=Ownership.ALLY, bands=(HsvWindow(h_lo=45, h_hi=85),)
         ),
         OwnershipColor(
             name="red",
             ownership=Ownership.ENEMY,
-            bands=(OwnershipHsvBand(h_lo=0, h_hi=10), OwnershipHsvBand(h_lo=170, h_hi=179)),
+            bands=(HsvWindow(h_lo=0, h_hi=10), HsvWindow(h_lo=170, h_hi=179)),
         ),
         OwnershipColor(
-            name="yellow", ownership=Ownership.GAIA, bands=(OwnershipHsvBand(h_lo=22, h_hi=34),)
+            name="yellow", ownership=Ownership.GAIA, bands=(HsvWindow(h_lo=22, h_hi=34),)
         ),
     )
 
@@ -172,23 +176,6 @@ class OwnershipPalette(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     colors: tuple[OwnershipColor, ...] = Field(default_factory=_default_ownership_colors)
-
-
-class HsvWindow(BaseModel):
-    """A generic inclusive HSV window (OpenCV ranges: H 0-179, S/V 0-255).
-
-    Same shape as :class:`OwnershipHsvBand`; kept distinct for now, to be unified
-    into a single HSV-window type in the P4 dedup pass.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    h_lo: int = Field(ge=0, le=179)
-    h_hi: int = Field(ge=0, le=179)
-    s_lo: int = Field(default=70, ge=0, le=255)
-    s_hi: int = Field(default=255, ge=0, le=255)
-    v_lo: int = Field(default=50, ge=0, le=255)
-    v_hi: int = Field(default=255, ge=0, le=255)
 
 
 class ResourceCueSetting(BaseModel):
