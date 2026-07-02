@@ -1,0 +1,466 @@
+{
+  "thresholds": {
+    "min_confidence": 0.5,
+    "min_health": 0.0,
+    "hud_read_max_error": 0.01,
+    "detection_map_target": 0.8,
+    "ownership_accuracy_target": 0.98,
+    "tracking_mota_target": 0.7,
+    "eval_iou_threshold": 0.5
+  },
+  "paths": {
+    "recordings_dir": "recordings",
+    "calibration_dir": "calibration"
+  },
+  "overlay": {
+    "owner_palette": {
+      "colors": {
+        "self": [
+          60,
+          180,
+          75
+        ],
+        "ally": [
+          0,
+          130,
+          200
+        ],
+        "enemy": [
+          230,
+          25,
+          75
+        ],
+        "gaia": [
+          170,
+          170,
+          170
+        ],
+        "unknown": [
+          255,
+          255,
+          255
+        ]
+      }
+    },
+    "fog_palette": {
+      "colors": {
+        "unexplored": [
+          20,
+          20,
+          20
+        ],
+        "explored": [
+          90,
+          90,
+          90
+        ],
+        "visible": [
+          60,
+          120,
+          60
+        ]
+      }
+    },
+    "health_good": [
+      60,
+      180,
+      75
+    ],
+    "health_warn": [
+      255,
+      200,
+      0
+    ],
+    "health_bad": [
+      230,
+      25,
+      75
+    ],
+    "health_good_min": 0.5,
+    "health_warn_min": 0.25,
+    "hud_text_color": [
+      255,
+      255,
+      255
+    ],
+    "hud_panel_color": [
+      0,
+      0,
+      0
+    ],
+    "font_scale": 0.4,
+    "box_thickness": 1,
+    "minimap_fraction": 0.25
+  },
+  "perception": {
+    "ownership_palette": {
+      "colors": [
+        {
+          "name": "blue",
+          "ownership": "self",
+          "bands": [
+            {
+              "h_lo": 100,
+              "h_hi": 130,
+              "s_lo": 70,
+              "s_hi": 255,
+              "v_lo": 50,
+              "v_hi": 255
+            }
+          ]
+        },
+        {
+          "name": "green",
+          "ownership": "ally",
+          "bands": [
+            {
+              "h_lo": 45,
+              "h_hi": 85,
+              "s_lo": 70,
+              "s_hi": 255,
+              "v_lo": 50,
+              "v_hi": 255
+            }
+          ]
+        },
+        {
+          "name": "red",
+          "ownership": "enemy",
+          "bands": [
+            {
+              "h_lo": 0,
+              "h_hi": 10,
+              "s_lo": 70,
+              "s_hi": 255,
+              "v_lo": 50,
+              "v_hi": 255
+            },
+            {
+              "h_lo": 170,
+              "h_hi": 179,
+              "s_lo": 70,
+              "s_hi": 255,
+              "v_lo": 50,
+              "v_hi": 255
+            }
+          ]
+        },
+        {
+          "name": "yellow",
+          "ownership": "gaia",
+          "bands": [
+            {
+              "h_lo": 22,
+              "h_hi": 34,
+              "s_lo": 70,
+              "s_hi": 255,
+              "v_lo": 50,
+              "v_hi": 255
+            }
+          ]
+        }
+      ]
+    },
+    "ownership_min_fraction": 0.02,
+    "detect_resources": true,
+    "resource_cues": [
+      {
+        "entity_type": "tree",
+        "bands": [
+          {
+            "h_lo": 35,
+            "h_hi": 85,
+            "s_lo": 40,
+            "s_hi": 255,
+            "v_lo": 30,
+            "v_hi": 255
+          }
+        ],
+        "min_area": 20
+      },
+      {
+        "entity_type": "mine",
+        "bands": [
+          {
+            "h_lo": 0,
+            "h_hi": 179,
+            "s_lo": 0,
+            "s_hi": 50,
+            "v_lo": 50,
+            "v_hi": 190
+          }
+        ],
+        "min_area": 20
+      },
+      {
+        "entity_type": "bush",
+        "bands": [
+          {
+            "h_lo": 0,
+            "h_hi": 8,
+            "s_lo": 90,
+            "s_hi": 255,
+            "v_lo": 60,
+            "v_hi": 255
+          },
+          {
+            "h_lo": 168,
+            "h_hi": 179,
+            "s_lo": 90,
+            "s_hi": 255,
+            "v_lo": 60,
+            "v_hi": 255
+          }
+        ],
+        "min_area": 20
+      },
+      {
+        "entity_type": "fauna",
+        "bands": [
+          {
+            "h_lo": 9,
+            "h_hi": 25,
+            "s_lo": 60,
+            "s_hi": 200,
+            "v_lo": 40,
+            "v_hi": 190
+          }
+        ],
+        "min_area": 20
+      }
+    ],
+    "health": {
+      "max_offset": 20,
+      "s_min": 60,
+      "v_min": 60,
+      "min_run": 0.15
+    },
+    "state": {
+      "selection": {
+        "thickness": 3,
+        "brightness": 200,
+        "min_fraction": 0.4
+      },
+      "construction": {
+        "edge_density_min": 0.12,
+        "canny_lo": 60.0,
+        "canny_hi": 180.0
+      },
+      "garrison": {
+        "top_fraction": 0.35,
+        "brightness": 200,
+        "max_saturation": 70,
+        "min_badge_area": 6,
+        "max_badge_width_fraction": 0.5
+      }
+    }
+  },
+  "minimap": {
+    "palette": [
+      {
+        "label": "self",
+        "color": {
+          "b": 235,
+          "g": 90,
+          "r": 40
+        },
+        "ownership": "self"
+      },
+      {
+        "label": "ally",
+        "color": {
+          "b": 60,
+          "g": 200,
+          "r": 60
+        },
+        "ownership": "ally"
+      },
+      {
+        "label": "enemy",
+        "color": {
+          "b": 40,
+          "g": 40,
+          "r": 220
+        },
+        "ownership": "enemy"
+      },
+      {
+        "label": "gaia",
+        "color": {
+          "b": 235,
+          "g": 235,
+          "r": 235
+        },
+        "ownership": "gaia"
+      }
+    ],
+    "world_extent": {
+      "origin_x": 0.0,
+      "origin_y": 0.0,
+      "width": 1024.0,
+      "height": 1024.0,
+      "flip_y": true
+    },
+    "fog": {
+      "rows": 16,
+      "cols": 16,
+      "unexplored_max": 25.0,
+      "visible_min": 140.0
+    },
+    "blips": {
+      "tolerance": 70.0,
+      "min_area": 1,
+      "max_area": 60,
+      "confidence": 0.8
+    },
+    "territory": {
+      "tolerance": 90.0,
+      "min_area": 64
+    },
+    "viewport": {
+      "white_min": 200,
+      "min_area": 64,
+      "min_side": 8
+    },
+    "disc_shape": false,
+    "region_confidence": 0.9
+  },
+  "hud": {
+    "top_bar": {
+      "food": {
+        "x": 0.03,
+        "y": 0.0,
+        "width": 0.1,
+        "height": 1.0
+      },
+      "wood": {
+        "x": 0.15,
+        "y": 0.0,
+        "width": 0.1,
+        "height": 1.0
+      },
+      "stone": {
+        "x": 0.27,
+        "y": 0.0,
+        "width": 0.1,
+        "height": 1.0
+      },
+      "metal": {
+        "x": 0.39,
+        "y": 0.0,
+        "width": 0.1,
+        "height": 1.0
+      },
+      "population": {
+        "x": 0.51,
+        "y": 0.0,
+        "width": 0.12,
+        "height": 1.0
+      },
+      "phase": {
+        "x": 0.8,
+        "y": 0.0,
+        "width": 0.18,
+        "height": 1.0
+      },
+      "swatch": {
+        "x": 0.0,
+        "y": 0.2,
+        "width": 0.025,
+        "height": 0.6
+      },
+      "civ": {
+        "x": 0.66,
+        "y": 0.0,
+        "width": 0.13,
+        "height": 1.0
+      }
+    },
+    "selection": {
+      "entity_type": {
+        "x": 0.05,
+        "y": 0.05,
+        "width": 0.9,
+        "height": 0.25
+      },
+      "health": {
+        "x": 0.05,
+        "y": 0.35,
+        "width": 0.5,
+        "height": 0.25
+      },
+      "queue": {
+        "x": 0.05,
+        "y": 0.7,
+        "width": 0.9,
+        "height": 0.28
+      }
+    },
+    "ocr_config": "--psm 7"
+  },
+  "tracking": {
+    "iou_threshold": 0.3,
+    "min_hits": 1,
+    "max_staleness": 15,
+    "decay": 0.85,
+    "combat_drop": 0.05,
+    "depletion_health": 0.02
+  },
+  "preprocessing": {
+    "hud": {
+      "gaussian_ksize": 3,
+      "clahe_clip_limit": 2.0,
+      "clahe_tile": [
+        8,
+        8
+      ]
+    },
+    "scene": {
+      "bilateral_diameter": 5,
+      "bilateral_sigma_color": 50.0,
+      "bilateral_sigma_space": 50.0,
+      "clahe_clip_limit": 3.0,
+      "clahe_tile": [
+        8,
+        8
+      ]
+    }
+  },
+  "calibration": {
+    "ratios": {
+      "top_bar_height": 0.035,
+      "minimap_side": 0.2,
+      "selection_width": 0.34,
+      "selection_height": 0.16
+    },
+    "theme": "default",
+    "use_anchors": true,
+    "default_ui_scale": 1.0,
+    "ui_scale_min": 0.5,
+    "ui_scale_max": 3.0,
+    "selfcheck_match_threshold": 0.5,
+    "selfcheck_use_anchors": true
+  },
+  "perf": {
+    "latency_target_ms": 66.0,
+    "throughput_target_fps": 15.0
+  },
+  "pipeline": {
+    "recalibrate_interval": 30
+  },
+  "acquisition": {
+    "offline_fps": 30.0,
+    "image_extensions": [
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".bmp",
+      ".tif",
+      ".tiff"
+    ]
+  },
+  "geometry": {
+    "camera_error_tolerance": 1.0,
+    "fusion_agreement_scale": 1.0
+  }
+}
