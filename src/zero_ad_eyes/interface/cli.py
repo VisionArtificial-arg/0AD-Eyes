@@ -27,35 +27,40 @@ def _offline_source(recording: str) -> FrameSource:
     return ImageFolderSource(path) if path.is_dir() else VideoFileSource(path)
 
 
+def _perception_model(detector: str) -> PerceptionModel:
+    """The detection model behind the seam. ``classical`` is the v1 default — the
+    E6a/E11 baseline that actually perceives from pixels; ``stub`` emits nothing
+    (plumbing only). The learned adapter (MP4) would slot in here unchanged."""
+
+    if detector == "classical":
+        from zero_ad_eyes.infrastructure.perception import ClassicalPerceptionModel
+
+        return ClassicalPerceptionModel()
+    return StubPerceptionModel()
+
+
 def _build_offline_pipeline(
-    recording: str, *, detector: str = "stub", profiler: StageProfiler | None = None
+    recording: str, *, detector: str = "classical", profiler: StageProfiler | None = None
 ) -> PerceptionPipeline:
     """Wire the real classical chain over a recording (EPIC A→G integration).
 
-    Everything except the detection *model* is a real classical adapter: offline
-    source, preprocessing, HUD calibration + reader, minimap reader, IoU tracker,
-    and the classical entity enricher (ownership/health/state). The model seam stays
-    plugged with the stub (🔌) by default so the learned detector remains the only
-    thing to swap in at MP4; ``--detector classical`` opts into the classical
-    detection baseline (E6a) meanwhile.
+    Every stage is a real classical adapter: offline source, preprocessing, HUD
+    calibration + self-check, HUD/minimap readers, IoU tracker, entity enricher, and
+    the classical detection baseline (E6a/E11) — the v1 default. ``--detector stub``
+    swaps in the empty stub for plumbing-only runs; a learned adapter (MP4) would
+    swap in here identically.
     """
 
     from zero_ad_eyes.infrastructure.calibration import HudCalibrator, LayoutSelfCheck
     from zero_ad_eyes.infrastructure.hud.reader import ClassicalHudReader
     from zero_ad_eyes.infrastructure.minimap.reader import ClassicalMinimapReader
-    from zero_ad_eyes.infrastructure.perception import (
-        ClassicalEntityEnricher,
-        ClassicalPerceptionModel,
-    )
+    from zero_ad_eyes.infrastructure.perception import ClassicalEntityEnricher
     from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector, IouTracker
 
-    model: PerceptionModel = (
-        ClassicalPerceptionModel() if detector == "classical" else StubPerceptionModel()
-    )
     return PerceptionPipeline(
         _offline_source(recording),
-        model,
+        _perception_model(detector),
         preprocessor=PreprocessingPipeline(),
         calibrator=HudCalibrator(),
         self_check=LayoutSelfCheck(),
@@ -180,7 +185,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zero-ad-eyes", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run = sub.add_parser("run", help="run the pipeline (synthetic source, stub model)")
+    run = sub.add_parser("run", help="run the pipeline (classical detection by default)")
     run.add_argument("--frames", type=int, default=3)
     run.add_argument("--width", type=int, default=1280)
     run.add_argument("--height", type=int, default=720)
@@ -191,9 +196,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     run.add_argument(
         "--detector",
-        choices=("stub", "classical"),
-        default="stub",
-        help="detection source for --recording; stub keeps the model seam plugged (default)",
+        choices=("classical", "stub"),
+        default="classical",
+        help="detection model behind the seam (v1 default: classical; stub = plumbing only)",
     )
 
     ev = sub.add_parser("eval", help="run the ML8 accuracy harness (NF3 metrics)")
@@ -207,7 +212,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench.add_argument(
         "--recording", default=None, help="benchmark the real classical chain over a recording"
     )
-    bench.add_argument("--detector", choices=("stub", "classical"), default="stub")
+    bench.add_argument("--detector", choices=("classical", "stub"), default="classical")
 
     args = parser.parse_args(argv)
 
@@ -216,7 +221,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             pipeline = _build_offline_pipeline(args.recording, detector=args.detector)
         else:
             source = _synthetic_source(args.frames, args.width, args.height)
-            pipeline = PerceptionPipeline(source, StubPerceptionModel())  # type: ignore[arg-type]
+            model = _perception_model(args.detector)
+            pipeline = PerceptionPipeline(source, model)  # type: ignore[arg-type]
         for world_model in pipeline.run():
             print(world_model.model_dump_json())
         return 0
