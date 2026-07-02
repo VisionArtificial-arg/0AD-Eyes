@@ -1,18 +1,24 @@
-"""MP2 — the frozen, versioned ``PerceptionModel`` I/O contract.
+"""MP2 — the versioned ``PerceptionModel`` I/O contract (provisional on model internals).
 
-This is the single cross-team artifact of §5.10: the *only* thing the model team
-builds *to*, and the thing MP5 parity tests enforce so "plug-and-play" never
-silently becomes a rewrite (risk R6). It is a machine-readable value object — a
-frozen pydantic model that serialises to/from JSON — so it can be shipped in the
-artifact hand-off (§5.10.3) and diffed in CI.
+The architectural seam of §5.10: the interface every adapter (stub, classical,
+future learned) satisfies, enforced by MP5 parity so swapping one for another never
+silently becomes a rewrite. A machine-readable value object — a frozen pydantic model
+that serialises to/from JSON — diffable in CI.
 
-It pins four things (REQUIREMENTS.md §5.10.2 / MP2):
-  1. the **input tensor** spec (size, channel order, layout, dtype, normalization
-     expressed in EPIC-P terms);
+There is **no model team building a learned model**, so the contract is split by who
+each field actually serves:
+
+  **Frozen now** (model-agnostic; this team's downstream depends on it):
   2. the **output schema** (the domain ``Detections`` value object);
-  3. the **class-id ↔ taxonomy** mapping (§4.3);
+  3. the **class-id ↔ taxonomy** mapping — coarse ``EntityKind`` only in v1;
   4. the **coordinate + scale convention**, plus the rule that *every* detection
      carries a first-class confidence and a provenance tag.
+
+  **Provisional / deferred** (model-internal; committed only when a model exists):
+  1. the **input tensor** spec (size, channel order, layout, dtype, normalization).
+     ``default_contract().input is None`` (``is_provisional``); a real model fills it
+     via :func:`committed_contract` at hand-off. Committing specific values now would
+     be a guess — the classical and stub adapters never read it anyway.
 
 Nothing here imports a model framework or weights: the contract describes the plug
 socket, not the plug.
@@ -164,10 +170,22 @@ class ModelIOContract(BaseModel):
 
     version: str = CONTRACT_VERSION
     output_schema: str = OUTPUT_SCHEMA
-    input: InputTensorSpec
+    # Model-internal: the exact input tensor a learned model consumes. Left absent
+    # until a real model is delivered — there is no team building one, so committing
+    # a specific size/normalization now would be a guess with no empirical basis. The
+    # stub and classical adapters never read it; the downstream-invariant half of the
+    # contract (output schema, coordinates, per-detection invariants, coarse classes)
+    # is what this team freezes and what MP5 parity enforces.
+    input: InputTensorSpec | None = None
     classes: ClassMapping
     coordinates: CoordinateConvention = CoordinateConvention()
     detection: DetectionRequirements = DetectionRequirements()
+
+    @property
+    def is_provisional(self) -> bool:
+        """True while the model-internal input spec is uncommitted (no model yet)."""
+
+        return self.input is None
 
     def validate_detections(self, detections: Detections, frame_id: int) -> None:
         """Assert a ``Detections`` payload honours this contract.
@@ -193,38 +211,47 @@ class ModelIOContract(BaseModel):
                 )
 
 
-def default_contract() -> ModelIOContract:
-    """The v1 contract this team freezes; the model team builds to this.
+def _coarse_class_map() -> ClassMapping:
+    """v1 class map: the closed coarse ``EntityKind`` enum only.
 
-    The class map covers only the coarse ``EntityKind`` closed enum — the fine
-    per-civ types (OQ-4) are delivered by the model team as an extension of
-    ``entity_type_by_class_id`` without a contract break.
+    Exact per-civ types (A3/OQ-4) are deferred to the learned model as an additive
+    extension of ``entity_type_by_class_id`` — nothing this team can build today
+    emits them, and they are the project's hardest target (R1b), so v1 stays coarse.
     """
 
-    return ModelIOContract(
-        input=InputTensorSpec(
-            height=640,
-            width=640,
-            channel_order=ChannelOrder.RGB,
-            layout=TensorLayout.NCHW,
-            dtype="float32",
-            normalization=Normalization(
-                scale=1.0 / 255.0,
-                mean=(0.0, 0.0, 0.0),
-                std=(1.0, 1.0, 1.0),
-            ),
-        ),
-        classes=ClassMapping(
-            kind_by_class_id={
-                0: EntityKind.UNIT,
-                1: EntityKind.BUILDING,
-                2: EntityKind.RESOURCE_NODE,
-                3: EntityKind.PROJECTILE,
-                4: EntityKind.OTHER,
-            },
-        ),
+    return ClassMapping(
+        kind_by_class_id={
+            0: EntityKind.UNIT,
+            1: EntityKind.BUILDING,
+            2: EntityKind.RESOURCE_NODE,
+            3: EntityKind.PROJECTILE,
+            4: EntityKind.OTHER,
+        },
     )
 
 
+def default_contract() -> ModelIOContract:
+    """The **provisional** v1 contract this team freezes for its own downstream.
+
+    Frozen now (model-agnostic, MP5-enforced): the ``Detections`` output schema, the
+    coordinate/scale convention, the mandatory confidence+provenance invariants, and
+    the coarse class map. **Not** committed: the model-internal input tensor spec —
+    ``input`` is ``None`` until an actual model is delivered (``is_provisional``).
+    """
+
+    return ModelIOContract(classes=_coarse_class_map())
+
+
+def committed_contract(
+    input_spec: InputTensorSpec, *, classes: ClassMapping | None = None
+) -> ModelIOContract:
+    """The contract once a real model exists: the frozen v1 seam plus the delivered
+    model-internal input tensor spec (and optionally an extended class map). Produced
+    at model hand-off (MP4/§5.10.3); ``is_provisional`` is then ``False``."""
+
+    return ModelIOContract(input=input_spec, classes=classes or _coarse_class_map())
+
+
 MODEL_IO_CONTRACT_V1 = default_contract()
-"""The frozen v1 contract instance. Import this as the canonical seam spec."""
+"""The frozen (downstream-invariant) v1 seam. Provisional on model-internal fields
+until a model is delivered — see :func:`committed_contract`."""

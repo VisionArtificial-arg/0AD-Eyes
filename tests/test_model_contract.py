@@ -12,8 +12,13 @@ from zero_ad_eyes.domain.taxonomy import EntityKind
 from zero_ad_eyes.infrastructure.model.contract import (
     CONTRACT_VERSION,
     MODEL_IO_CONTRACT_V1,
+    ChannelOrder,
     ContractViolation,
+    InputTensorSpec,
     ModelIOContract,
+    Normalization,
+    TensorLayout,
+    committed_contract,
     default_contract,
 )
 
@@ -23,6 +28,27 @@ def test_contract_is_versioned_and_frozen() -> None:
     assert contract.version == CONTRACT_VERSION
     with pytest.raises(ValidationError):
         contract.version = "9.9.9"  # type: ignore[misc]
+
+
+def test_default_contract_is_provisional_without_a_model() -> None:
+    # No model exists, so the model-internal input spec is deliberately uncommitted.
+    contract = default_contract()
+    assert contract.is_provisional
+    assert contract.input is None
+
+
+def test_committed_contract_supplies_the_input_spec() -> None:
+    spec = InputTensorSpec(
+        height=640,
+        width=640,
+        channel_order=ChannelOrder.RGB,
+        layout=TensorLayout.NCHW,
+        dtype="float32",
+        normalization=Normalization(scale=1.0 / 255.0, mean=(0.0, 0.0, 0.0), std=(1.0, 1.0, 1.0)),
+    )
+    contract = committed_contract(spec)
+    assert not contract.is_provisional
+    assert contract.input == spec
 
 
 def test_contract_round_trips_through_json() -> None:
