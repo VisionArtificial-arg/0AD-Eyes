@@ -15,6 +15,7 @@ functions returning a fresh :class:`PreprocessingPipeline`, so a caller can insp
 
 from __future__ import annotations
 
+from zero_ad_eyes.application.settings import HudPipelineSettings, ScenePipelineSettings
 from zero_ad_eyes.domain.geometry import ScreenBBox
 
 from .base import PreprocessStep
@@ -25,28 +26,36 @@ from .pipeline import PreprocessingPipeline
 from .roi import GateMode, RoiGate
 
 
-def hud_pipeline(region: ScreenBBox | None = None) -> PreprocessingPipeline:
-    """A HUD-tuned preprocessing chain (P1).
+def hud_pipeline(
+    region: ScreenBBox | None = None, *, settings: HudPipelineSettings | None = None
+) -> PreprocessingPipeline:
+    """A HUD-tuned preprocessing chain (P1), parameterised by config (NF7).
 
     When ``region`` is given, the frame is masked to it first so downstream HUD
-    parsing ignores the scene.
+    parsing ignores the scene. Default ``settings`` reproduce the historical chain.
     """
 
+    cfg = settings or HudPipelineSettings()
     steps: list[PreprocessStep] = []
     if region is not None:
         steps.append(RoiGate(region, mode=GateMode.MASK))
-    steps.append(GaussianBlur(ksize=3))
-    steps.append(ClaheContrast(clip_limit=2.0, tile_grid_size=(8, 8)))
+    steps.append(GaussianBlur(ksize=cfg.gaussian_ksize))
+    steps.append(ClaheContrast(clip_limit=cfg.clahe_clip_limit, tile_grid_size=cfg.clahe_tile))
     return PreprocessingPipeline(steps)
 
 
-def scene_pipeline() -> PreprocessingPipeline:
-    """A scene-tuned preprocessing chain (P1)."""
+def scene_pipeline(*, settings: ScenePipelineSettings | None = None) -> PreprocessingPipeline:
+    """A scene-tuned preprocessing chain (P1), parameterised by config (NF7)."""
 
+    cfg = settings or ScenePipelineSettings()
     return PreprocessingPipeline(
         [
-            BilateralFilter(diameter=5, sigma_color=50.0, sigma_space=50.0),
+            BilateralFilter(
+                diameter=cfg.bilateral_diameter,
+                sigma_color=cfg.bilateral_sigma_color,
+                sigma_space=cfg.bilateral_sigma_space,
+            ),
             MinMaxNormalize(),
-            ClaheContrast(clip_limit=3.0, tile_grid_size=(8, 8)),
+            ClaheContrast(clip_limit=cfg.clahe_clip_limit, tile_grid_size=cfg.clahe_tile),
         ]
     )

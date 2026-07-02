@@ -377,6 +377,44 @@ class TrackingSettings(BaseModel):
     depletion_health: float = Field(default=0.02, ge=0.0, le=1.0)  # health ≤ this ⇒ depleted
 
 
+# --------------------------------------------------------------------------- #
+# Preprocessing tuning — pure DATA (Approach B): parameters of the pre-tuned    #
+# HUD / scene chains (EPIC P). The variant factories build the cv2 steps from    #
+# these; defaults reproduce the former baked values exactly.                     #
+# --------------------------------------------------------------------------- #
+
+
+class HudPipelineSettings(BaseModel):
+    """Parameters of the HUD-tuned preprocessing chain (P1/P4/P5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    gaussian_ksize: int = Field(default=3, gt=0)
+    clahe_clip_limit: float = Field(default=2.0, gt=0.0)
+    clahe_tile: tuple[int, int] = (8, 8)
+
+
+class ScenePipelineSettings(BaseModel):
+    """Parameters of the scene-tuned preprocessing chain (P1/P4/P5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    bilateral_diameter: int = Field(default=5, gt=0)
+    bilateral_sigma_color: float = 50.0
+    bilateral_sigma_space: float = 50.0
+    clahe_clip_limit: float = Field(default=3.0, gt=0.0)
+    clahe_tile: tuple[int, int] = (8, 8)
+
+
+class PreprocessingSettings(BaseModel):
+    """Classical preprocessing tuning (EPIC P), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    hud: HudPipelineSettings = Field(default_factory=HudPipelineSettings)
+    scene: ScenePipelineSettings = Field(default_factory=ScenePipelineSettings)
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -398,3 +436,4 @@ class Config(BaseModel):
     minimap: MinimapSettings = Field(default_factory=MinimapSettings)
     hud: HudSettings = Field(default_factory=HudSettings)
     tracking: TrackingSettings = Field(default_factory=TrackingSettings)
+    preprocessing: PreprocessingSettings = Field(default_factory=PreprocessingSettings)
