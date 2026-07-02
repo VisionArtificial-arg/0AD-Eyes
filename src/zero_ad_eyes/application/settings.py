@@ -301,6 +301,67 @@ class MinimapSettings(BaseModel):
     region_confidence: float = Field(default=0.9, ge=0.0, le=1.0)
 
 
+# --------------------------------------------------------------------------- #
+# HUD tuning — pure DATA (Approach B): the top-bar / selection-panel sub-region  #
+# fractions (EPIC C) and the OCR mode. Field names mirror the infra layout types #
+# so ClassicalHudReader.from_settings maps them by model_validate at the boundary.#
+# --------------------------------------------------------------------------- #
+
+
+class FractionalRegionSetting(BaseModel):
+    """A box as fractions [0, 1] of a parent HUD region (mirrors FractionalRegion)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+    width: float = Field(ge=0.0, le=1.0)
+    height: float = Field(ge=0.0, le=1.0)
+
+
+def _hud_slot(x: float, width: float) -> FractionalRegionSetting:
+    return FractionalRegionSetting(x=x, y=0.0, width=width, height=1.0)
+
+
+class TopBarLayoutSettings(BaseModel):
+    """Where each top-bar element sits, as fractions of the top_bar box (C1–C4)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    food: FractionalRegionSetting = _hud_slot(0.03, 0.10)
+    wood: FractionalRegionSetting = _hud_slot(0.15, 0.10)
+    stone: FractionalRegionSetting = _hud_slot(0.27, 0.10)
+    metal: FractionalRegionSetting = _hud_slot(0.39, 0.10)
+    population: FractionalRegionSetting = _hud_slot(0.51, 0.12)
+    phase: FractionalRegionSetting = _hud_slot(0.80, 0.18)
+    swatch: FractionalRegionSetting = FractionalRegionSetting(x=0.0, y=0.2, width=0.025, height=0.6)
+    civ: FractionalRegionSetting = _hud_slot(0.66, 0.13)
+
+
+class SelectionPanelLayoutSettings(BaseModel):
+    """Sub-regions of the bottom-centre selection panel (C5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    entity_type: FractionalRegionSetting = FractionalRegionSetting(
+        x=0.05, y=0.05, width=0.9, height=0.25
+    )
+    health: FractionalRegionSetting = FractionalRegionSetting(
+        x=0.05, y=0.35, width=0.5, height=0.25
+    )
+    queue: FractionalRegionSetting = FractionalRegionSetting(x=0.05, y=0.7, width=0.9, height=0.28)
+
+
+class HudSettings(BaseModel):
+    """Classical HUD-reader tuning (EPIC C), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    top_bar: TopBarLayoutSettings = Field(default_factory=TopBarLayoutSettings)
+    selection: SelectionPanelLayoutSettings = Field(default_factory=SelectionPanelLayoutSettings)
+    ocr_config: str = "--psm 7"  # Tesseract page-segmentation mode (single line)
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -320,3 +381,4 @@ class Config(BaseModel):
     overlay: OverlaySettings = Field(default_factory=OverlaySettings)
     perception: PerceptionSettings = Field(default_factory=PerceptionSettings)
     minimap: MinimapSettings = Field(default_factory=MinimapSettings)
+    hud: HudSettings = Field(default_factory=HudSettings)

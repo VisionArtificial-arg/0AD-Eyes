@@ -13,6 +13,7 @@ This file grows one task at a time; C1 populates the four resource stockpiles.
 from __future__ import annotations
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import HudSettings
 from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.geometry import ScreenBBox
@@ -47,6 +48,18 @@ class ClassicalHudReader:
         self._top_bar = top_bar_layout if top_bar_layout is not None else TopBarLayout()
         self._selection = (
             selection_layout if selection_layout is not None else SelectionPanelLayout()
+        )
+
+    @classmethod
+    def from_settings(cls, settings: HudSettings) -> ClassicalHudReader:
+        """Build from pure config (Approach B). Field names of the settings mirror the
+        infra layout types 1:1, so the boundary mapping is a ``model_validate`` of the
+        dumped data — no per-field wiring to drift."""
+
+        return cls(
+            TesseractOcrEngine(config=settings.ocr_config),
+            top_bar_layout=TopBarLayout.model_validate(settings.top_bar.model_dump()),
+            selection_layout=SelectionPanelLayout.model_validate(settings.selection.model_dump()),
         )
 
     def read(self, frame: Frame, calibration: Calibration) -> HudState:
