@@ -11,6 +11,7 @@ mentions OpenCV, a model framework, or a screen-capture library.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import AbstractContextManager
 from typing import Protocol, runtime_checkable
 
 from zero_ad_eyes.domain.calibration import Calibration
@@ -106,3 +107,12 @@ class WorldModelSink(Protocol):
     """EPIC H — receives each published world model (the decision-layer boundary)."""
 
     def publish(self, world_model: WorldModel) -> None: ...
+
+
+@runtime_checkable
+class StageProfiler(Protocol):
+    """NF6 — per-stage timing. The pipeline demarcates a stage; the profiler decides
+    how (and whether) to measure it. ``measure`` returns a context manager wrapping
+    the stage's work, so the pipeline stays free of any clock."""
+
+    def measure(self, stage: str) -> AbstractContextManager[None]: ...

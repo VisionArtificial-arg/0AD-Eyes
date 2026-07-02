@@ -73,3 +73,51 @@ def test_benchmark_runs_on_wall_clock() -> None:
     assert report.latency.count == 2
     assert report.throughput_fps >= 0.0
     assert report.latency.min_ms <= report.latency.p50_ms <= report.latency.max_ms
+
+
+def test_stage_timings_measure_with_injected_clock() -> None:
+    from zero_ad_eyes.infrastructure.perf import StageTimings
+
+    clock = _fake_clock([1.0, 1.020, 5.0, 5.010])  # two measures: 20 ms then 10 ms
+    timings = StageTimings(clock=clock)
+    with timings.measure("infer"):
+        pass
+    with timings.measure("infer"):
+        pass
+
+    stats = timings.stats()
+    assert stats["infer"].count == 2
+    assert stats["infer"].min_ms == pytest.approx(10.0)
+    assert stats["infer"].max_ms == pytest.approx(20.0)
+
+
+def test_pipeline_records_per_stage_timings() -> None:
+    from zero_ad_eyes.infrastructure.perf import StageTimings
+    from zero_ad_eyes.infrastructure.tracking import IouTracker
+
+    frames = [
+        Frame(
+            image=np.zeros((4, 4, 3), dtype=np.uint8),
+            meta=FrameMeta(frame_id=i, timestamp=float(i), source="test", width=4, height=4),
+        )
+        for i in range(3)
+    ]
+    timings = StageTimings()
+    pipeline = PerceptionPipeline(
+        InMemoryFrameSource(frames),
+        StubPerceptionModel(),
+        tracker=IouTracker(),
+        profiler=timings,
+    )
+
+    list(pipeline.run())
+
+    stats = timings.stats()
+    assert stats["infer"].count == 3  # infer runs every frame
+    assert stats["track"].count == 3  # tracker present → track stage runs
+    assert stats["infer"].min_ms >= 0.0
+
+
+def test_no_profiler_is_zero_overhead_and_unchanged() -> None:
+    # Without a profiler the pipeline still yields the same number of world models.
+    assert len(list(_pipeline(3).run())) == 3

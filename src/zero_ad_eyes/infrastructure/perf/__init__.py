@@ -16,12 +16,14 @@ from .benchmark import (
     benchmark,
     latency_stats,
 )
+from .stage_timings import StageTimings
 
 __all__ = [
     "DEFAULT_LATENCY_TARGET_MS",
     "DEFAULT_THROUGHPUT_TARGET_FPS",
     "BenchmarkReport",
     "LatencyStats",
+    "StageTimings",
     "benchmark",
     "latency_stats",
 ]

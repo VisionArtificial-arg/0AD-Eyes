@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
-from zero_ad_eyes.application.ports import FrameSource, PerceptionModel
+from zero_ad_eyes.application.ports import FrameSource, PerceptionModel, StageProfiler
 from zero_ad_eyes.infrastructure.model.stub_adapter import StubPerceptionModel
 
 
@@ -27,7 +27,9 @@ def _offline_source(recording: str) -> FrameSource:
     return ImageFolderSource(path) if path.is_dir() else VideoFileSource(path)
 
 
-def _build_offline_pipeline(recording: str, *, detector: str = "stub") -> PerceptionPipeline:
+def _build_offline_pipeline(
+    recording: str, *, detector: str = "stub", profiler: StageProfiler | None = None
+) -> PerceptionPipeline:
     """Wire the real classical chain over a recording (EPIC A→G integration).
 
     Everything except the detection *model* is a real classical adapter: offline
@@ -61,6 +63,7 @@ def _build_offline_pipeline(recording: str, *, detector: str = "stub") -> Percep
         tracker=IouTracker(),
         enricher=ClassicalEntityEnricher(),
         event_detector=ClassicalEventDetector(),
+        profiler=profiler,
     )
 
 
@@ -139,13 +142,14 @@ def _run_bench(
     provisional (the learned inference that dominates NF1 is absent), so it reports
     but never gates. A real measured failure (model in the loop) exits non-zero."""
 
-    from zero_ad_eyes.infrastructure.perf import benchmark
+    from zero_ad_eyes.infrastructure.perf import StageTimings, benchmark
 
+    timings = StageTimings()
     if recording is not None:
-        pipeline = _build_offline_pipeline(recording, detector=detector)
+        pipeline = _build_offline_pipeline(recording, detector=detector, profiler=timings)
     else:
         source = _synthetic_source(frames, width, height)
-        pipeline = PerceptionPipeline(source, StubPerceptionModel())  # type: ignore[arg-type]
+        pipeline = PerceptionPipeline(source, StubPerceptionModel(), profiler=timings)  # type: ignore[arg-type]
 
     report = benchmark(pipeline, warmup=warmup, model_available=False)
     latency = report.latency
@@ -158,6 +162,11 @@ def _run_bench(
         f"  throughput  {report.throughput_fps:.1f} fps  "
         f"(target >= {report.throughput_target_fps:.0f})"
     )
+    per_stage = timings.stats()
+    if per_stage:
+        print("  per-stage (NF6):")
+        for stage, stats in per_stage.items():
+            print(f"    {stage:10s} p95={stats.p95_ms:6.2f}  mean={stats.mean_ms:6.2f}  ms")
     if report.is_provisional:
         print("  verdict: PROVISIONAL (stub/classical path; real NF1 gate closes at MP4)")
         return 0
