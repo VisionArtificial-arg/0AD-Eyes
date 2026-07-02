@@ -12,7 +12,7 @@ from collections.abc import Iterator, Sequence
 from zero_ad_eyes.application.frames import Frame
 
 from .backpressure import BoundedFrameBuffer, ThreadedFrameSource
-from .offline import ImageFolderSource, VideoFileSource
+from .offline import ImageFolderSource, RecordedVideoSource, VideoFileSource
 from .recorder import FrameRecorder
 from .recording import FrameStamp, RecordingManifest
 from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource
@@ -40,6 +40,7 @@ __all__ = [
     "ImageFolderSource",
     "InMemoryFrameSource",
     "MssGrabber",
+    "RecordedVideoSource",
     "RecordingManifest",
     "ScreenCaptureSource",
     "ThreadedFrameSource",

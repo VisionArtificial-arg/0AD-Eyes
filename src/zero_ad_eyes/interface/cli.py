@@ -39,15 +39,24 @@ def _offline_source(recording: str, acquisition: AcquisitionSettings) -> FrameSo
     """A recording is an image folder or a video file — pick the matching source.
 
     Image-folder replay is config-paced (offline_fps + accepted extensions); a video
-    file carries its own frame clock, so only the folder source takes config."""
+    file carries its own frame clock. A video written by ``--record`` has a sibling
+    ``.json`` sidecar (A5): when present we replay through :class:`RecordedVideoSource`
+    so frames regain the capture's true ``frame_id``/``timestamp`` — which is what lets
+    ``eval --recording`` align them to an engine ground-truth export (#2/D6)."""
 
-    from zero_ad_eyes.infrastructure.acquisition import ImageFolderSource, VideoFileSource
+    from zero_ad_eyes.infrastructure.acquisition import (
+        ImageFolderSource,
+        RecordedVideoSource,
+        VideoFileSource,
+    )
 
     path = Path(recording)
     if path.is_dir():
         return ImageFolderSource(
             path, extensions=acquisition.image_extensions, fps=acquisition.offline_fps
         )
+    if path.with_suffix(".json").exists():
+        return RecordedVideoSource(path)
     return VideoFileSource(path)
 
 
