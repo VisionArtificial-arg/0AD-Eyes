@@ -19,6 +19,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import AcquisitionSettings
 from zero_ad_eyes.domain.world_model import FrameMeta
 
 from .timing import Clock, FramePacer, Sleep
@@ -48,7 +49,7 @@ class Grabber(Protocol):
 class MssGrabber:
     """Default ``Grabber``: captures a monitor or region with ``mss`` (lazy handle)."""
 
-    def __init__(self, monitor: int = 1, region: CaptureRegion | None = None) -> None:
+    def __init__(self, monitor: int, region: CaptureRegion | None = None) -> None:
         self._monitor = monitor
         self._region = region
         self._sct: Any | None = None
@@ -86,9 +87,9 @@ class ScreenCaptureSource:
     def __init__(
         self,
         *,
-        monitor: int = 1,
+        monitor: int,
+        target_fps: float,
         region: CaptureRegion | None = None,
-        target_fps: float = 30.0,
         grabber: Grabber | None = None,
         max_frames: int | None = None,
         source: str = "live",
@@ -99,6 +100,30 @@ class ScreenCaptureSource:
         self._pacer = FramePacer(target_fps, clock=clock, sleep=sleep)
         self._max_frames = max_frames
         self._source = source
+
+    @classmethod
+    def from_settings(
+        cls,
+        settings: AcquisitionSettings,
+        *,
+        region: CaptureRegion | None = None,
+        grabber: Grabber | None = None,
+        max_frames: int | None = None,
+    ) -> ScreenCaptureSource:
+        """Build the live source from the ``acquisition`` config (Approach B).
+
+        The tuning values (which monitor, target FPS) come from config; ``region`` and
+        the run-control / test seams (``grabber``, ``max_frames``) are supplied by the
+        composition root, since they are not tuning defaults.
+        """
+
+        return cls(
+            monitor=settings.live_monitor,
+            target_fps=settings.live_fps,
+            region=region,
+            grabber=grabber,
+            max_frames=max_frames,
+        )
 
     @property
     def dropped_total(self) -> int:

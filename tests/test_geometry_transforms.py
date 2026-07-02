@@ -41,7 +41,7 @@ def test_chain_applies_left_to_right() -> None:
 
 
 def test_apply_screen_motion_tracks_a_pan() -> None:
-    projector = CameraProjector(SCREEN_TO_WORLD)
+    projector = CameraProjector(SCREEN_TO_WORLD, error_tolerance=1.0)
     world = WorldPoint(x=42.0, y=17.0)
     old_screen = projector.to_screen(world)
 
@@ -56,13 +56,13 @@ def test_apply_screen_motion_tracks_a_pan() -> None:
 
 
 def test_apply_screen_motion_carries_error_forward() -> None:
-    projector = CameraProjector(SCREEN_TO_WORLD, reprojection_error=0.7)
+    projector = CameraProjector(SCREEN_TO_WORLD, reprojection_error=0.7, error_tolerance=1.0)
     moved = projector.apply_screen_motion(scaling(1.5))
     assert moved.reprojection_error == pytest.approx(0.7)
 
 
 def test_update_replaces_the_map() -> None:
-    projector = CameraProjector(SCREEN_TO_WORLD)
+    projector = CameraProjector(SCREEN_TO_WORLD, error_tolerance=1.0)
     replacement = Homography.from_matrix([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
     updated = projector.update(replacement, reprojection_error=0.2)
     assert updated.reprojection_error == pytest.approx(0.2)
@@ -70,7 +70,7 @@ def test_update_replaces_the_map() -> None:
 
 
 def test_update_is_immutable() -> None:
-    projector = CameraProjector(SCREEN_TO_WORLD)
+    projector = CameraProjector(SCREEN_TO_WORLD, error_tolerance=1.0)
     projector.apply_screen_motion(translation(100.0, 100.0))
     # Original projector is unchanged by the motion.
     assert projector.to_world(ScreenPoint(x=0.0, y=0.0)) == WorldPoint(x=10.0, y=5.0)

@@ -15,7 +15,7 @@ IDENTITY = Homography.identity()
 
 
 def test_perfect_fit_is_full_confidence() -> None:
-    projector = CameraProjector(IDENTITY, reprojection_error=0.0)
+    projector = CameraProjector(IDENTITY, reprojection_error=0.0, error_tolerance=1.0)
     conf = projector.confidence()
     assert conf.value == pytest.approx(1.0)
     assert conf.provenance is Provenance.CLASSICAL
@@ -38,14 +38,16 @@ def test_residual_equal_to_tolerance_is_one_over_e() -> None:
 
 
 def test_to_world_with_confidence_pairs_point_and_confidence() -> None:
-    projector = CameraProjector(IDENTITY, reprojection_error=0.0)
+    projector = CameraProjector(IDENTITY, reprojection_error=0.0, error_tolerance=1.0)
     world, conf = projector.to_world_with_confidence(ScreenPoint(x=7.0, y=9.0))
     assert world == WorldPoint(x=7.0, y=9.0)
     assert conf.value == pytest.approx(1.0)
 
 
 def test_provenance_is_configurable() -> None:
-    projector = CameraProjector(IDENTITY, reprojection_error=0.0, provenance=Provenance.FUSED)
+    projector = CameraProjector(
+        IDENTITY, reprojection_error=0.0, error_tolerance=1.0, provenance=Provenance.FUSED
+    )
     assert projector.confidence().provenance is Provenance.FUSED
 
 

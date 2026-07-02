@@ -27,7 +27,7 @@ SCREEN_CORNERS = [
 
 
 def _projector() -> CameraProjector:
-    return CameraProjector(SCREEN_TO_WORLD)
+    return CameraProjector(SCREEN_TO_WORLD, error_tolerance=1.0)
 
 
 def test_to_world_returns_world_point() -> None:
@@ -46,7 +46,7 @@ def test_screen_world_round_trip() -> None:
 
 def test_from_correspondences_recovers_projection() -> None:
     world_pts = [projected for projected in (_projector().to_world(s) for s in SCREEN_CORNERS)]
-    recovered = CameraProjector.from_correspondences(SCREEN_CORNERS, world_pts)
+    recovered = CameraProjector.from_correspondences(SCREEN_CORNERS, world_pts, error_tolerance=1.0)
     for screen, expected in zip(SCREEN_CORNERS, world_pts, strict=True):
         got = recovered.to_world(screen)
         assert got.x == pytest.approx(expected.x, abs=1e-4)
@@ -55,7 +55,7 @@ def test_from_correspondences_recovers_projection() -> None:
 
 def test_from_correspondences_reports_small_residual() -> None:
     world_pts = [_projector().to_world(s) for s in SCREEN_CORNERS]
-    recovered = CameraProjector.from_correspondences(SCREEN_CORNERS, world_pts)
+    recovered = CameraProjector.from_correspondences(SCREEN_CORNERS, world_pts, error_tolerance=1.0)
     assert recovered.reprojection_error == pytest.approx(0.0, abs=1e-4)
 
 

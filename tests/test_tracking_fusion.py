@@ -33,7 +33,7 @@ def test_resolve_conflict_prefers_higher_confidence_and_fills_gaps() -> None:
     primary = _entity(0, value=0.4, ownership=Ownership.UNKNOWN, health=None)
     secondary = _entity(9, value=0.9, ownership=Ownership.ENEMY, health=0.5)
 
-    merged = resolve_conflict(primary, secondary)
+    merged = resolve_conflict(primary, secondary, agreement_scale=1.0)
 
     assert merged.entity_id == 0  # tracked identity preserved
     assert merged.ownership is Ownership.ENEMY  # winner supplies ownership
@@ -46,7 +46,7 @@ def test_resolve_conflict_backfills_from_lower_confidence_when_winner_unknown() 
     primary = _entity(0, value=0.9, ownership=Ownership.UNKNOWN, health=None)
     secondary = _entity(1, value=0.2, ownership=Ownership.ALLY, health=0.7)
 
-    merged = resolve_conflict(primary, secondary)
+    merged = resolve_conflict(primary, secondary, agreement_scale=1.0)
 
     assert merged.ownership is Ownership.ALLY  # winner unknown → backfilled
     assert merged.health == 0.7
@@ -59,7 +59,7 @@ def test_resolve_conflict_blends_world_pos_via_geometry_reconciler() -> None:
     primary = _entity(0, x=0.0, y=0.0, value=0.4)
     secondary = _entity(9, x=10.0, y=0.0, value=0.9)
 
-    merged = resolve_conflict(primary, secondary)
+    merged = resolve_conflict(primary, secondary, agreement_scale=1.0)
 
     assert merged.world_pos is not None
     # blended toward the more-confident source (10.0) but strictly between the two
@@ -77,7 +77,7 @@ def test_fuse_matches_nearby_hint_and_keeps_faraway_hint_separate() -> None:
         _entity(200, x=500.0, y=500.0, value=0.8, ownership=Ownership.GAIA),  # elsewhere
     )
 
-    fused = fuse_entities(primary, hints, match_radius=10.0)
+    fused = fuse_entities(primary, hints, match_radius=10.0, agreement_scale=1.0)
 
     assert len(fused) == 2
     reconciled = next(e for e in fused if e.entity_id == 0)
@@ -88,14 +88,14 @@ def test_fuse_matches_nearby_hint_and_keeps_faraway_hint_separate() -> None:
 
 def test_fuse_without_hints_is_identity() -> None:
     primary = (_entity(0), _entity(1, x=50.0))
-    assert fuse_entities(primary, ()) == primary
+    assert fuse_entities(primary, (), match_radius=20.0, agreement_scale=1.0) == primary
 
 
 def test_fuse_matches_each_primary_at_most_once() -> None:
     primary = (_entity(0, x=0.0),)
     hints = (_entity(10, x=1.0, value=0.9), _entity(11, x=2.0, value=0.8))
 
-    fused = fuse_entities(primary, hints, match_radius=10.0)
+    fused = fuse_entities(primary, hints, match_radius=10.0, agreement_scale=1.0)
 
     # one hint merges into primary 0; the second has no free primary → appended
     assert len(fused) == 2

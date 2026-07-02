@@ -14,7 +14,13 @@ def _conf(value: float, prov: Provenance = Provenance.CLASSICAL) -> Confidence:
 
 
 def test_fused_provenance_is_fused() -> None:
-    _, conf = reconcile(WorldPoint(x=0.0, y=0.0), _conf(0.8), WorldPoint(x=0.0, y=0.0), _conf(0.8))
+    _, conf = reconcile(
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.8),
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.8),
+        agreement_scale=1.0,
+    )
     assert conf.provenance is Provenance.FUSED
 
 
@@ -24,6 +30,7 @@ def test_confidence_weighted_position() -> None:
         _conf(0.75),
         WorldPoint(x=10.0, y=0.0),
         _conf(0.25),
+        agreement_scale=1.0,
     )
     # Weighted mean: (0.75*0 + 0.25*10) / 1.0 == 2.5
     assert point.x == pytest.approx(2.5)
@@ -31,28 +38,62 @@ def test_confidence_weighted_position() -> None:
 
 
 def test_equal_confidence_is_midpoint() -> None:
-    point, _ = reconcile(WorldPoint(x=2.0, y=4.0), _conf(0.6), WorldPoint(x=6.0, y=8.0), _conf(0.6))
+    point, _ = reconcile(
+        WorldPoint(x=2.0, y=4.0),
+        _conf(0.6),
+        WorldPoint(x=6.0, y=8.0),
+        _conf(0.6),
+        agreement_scale=1.0,
+    )
     assert point.x == pytest.approx(4.0)
     assert point.y == pytest.approx(6.0)
 
 
 def test_agreeing_sources_reinforce_confidence() -> None:
-    _, conf = reconcile(WorldPoint(x=5.0, y=5.0), _conf(0.6), WorldPoint(x=5.0, y=5.0), _conf(0.6))
+    _, conf = reconcile(
+        WorldPoint(x=5.0, y=5.0),
+        _conf(0.6),
+        WorldPoint(x=5.0, y=5.0),
+        _conf(0.6),
+        agreement_scale=1.0,
+    )
     # Same location -> agreement 1.0; noisy-OR of 0.6, 0.6 = 0.84 > either input.
     assert conf.value == pytest.approx(0.84)
 
 
 def test_disagreement_discounts_confidence() -> None:
-    _, close = reconcile(WorldPoint(x=0.0, y=0.0), _conf(0.6), WorldPoint(x=0.0, y=0.0), _conf(0.6))
-    _, near = reconcile(WorldPoint(x=0.0, y=0.0), _conf(0.6), WorldPoint(x=0.5, y=0.0), _conf(0.6))
-    _, far = reconcile(WorldPoint(x=0.0, y=0.0), _conf(0.6), WorldPoint(x=20.0, y=0.0), _conf(0.6))
+    _, close = reconcile(
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.6),
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.6),
+        agreement_scale=1.0,
+    )
+    _, near = reconcile(
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.6),
+        WorldPoint(x=0.5, y=0.0),
+        _conf(0.6),
+        agreement_scale=1.0,
+    )
+    _, far = reconcile(
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.6),
+        WorldPoint(x=20.0, y=0.0),
+        _conf(0.6),
+        agreement_scale=1.0,
+    )
     assert close.value > near.value > far.value
     assert far.value < 0.1
 
 
 def test_zero_confidence_falls_back_to_midpoint_unknown() -> None:
     point, conf = reconcile(
-        WorldPoint(x=0.0, y=0.0), _conf(0.0), WorldPoint(x=4.0, y=2.0), _conf(0.0)
+        WorldPoint(x=0.0, y=0.0),
+        _conf(0.0),
+        WorldPoint(x=4.0, y=2.0),
+        _conf(0.0),
+        agreement_scale=1.0,
     )
     assert point.x == pytest.approx(2.0)
     assert point.y == pytest.approx(1.0)
@@ -62,7 +103,11 @@ def test_zero_confidence_falls_back_to_midpoint_unknown() -> None:
 
 def test_single_trusted_source_dominates_position() -> None:
     point, _ = reconcile(
-        WorldPoint(x=3.0, y=3.0), _conf(0.9), WorldPoint(x=100.0, y=100.0), _conf(0.0)
+        WorldPoint(x=3.0, y=3.0),
+        _conf(0.9),
+        WorldPoint(x=100.0, y=100.0),
+        _conf(0.0),
+        agreement_scale=1.0,
     )
     assert point.x == pytest.approx(3.0)
     assert point.y == pytest.approx(3.0)

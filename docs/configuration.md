@@ -105,8 +105,8 @@ bool, `"--psm 6"` → string).
 | `calibration` | HUD region `ratios`, UI-scale bounds, self-check thresholds (EPIC B) |
 | `perf` | NF1/NF2 targets (`latency_target_ms`, `throughput_target_fps`) |
 | `pipeline` | `recalibrate_interval` (frames between B4 self-checks) |
-| `acquisition` | offline replay `offline_fps` + accepted `image_extensions` |
-| `geometry` | camera / fusion tolerances (declaration home; wired at fusion integration) |
+| `acquisition` | offline replay (`offline_fps`, `image_extensions`) + live capture (`live_monitor`, `live_fps`) |
+| `geometry` | camera projection (`camera_error_tolerance`) + fusion (`fusion_agreement_scale`, `fusion_match_radius`) |
 
 ## Recipes
 
@@ -163,8 +163,12 @@ save_config(default_config(), "my.json")  # then delete everything you don't wan
 
 - **Structural constants stay in code** (epsilons, the hue-179 OpenCV ceiling,
   minimum-size guards) — they are correctness invariants, not tuning knobs.
-- A few values are **declared but not yet wired** because their subsystem isn't in the
-  offline path yet: live-capture knobs, the `geometry` section, and the deep
-  calibration anchor/agreement constants. They take effect once those paths are wired.
+- A few sections are **config-complete but have no runtime consumer in the offline path
+  yet**: the live-capture knobs (`acquisition.live_*`, consumed by
+  `ScreenCaptureSource.from_settings` — used once a live run path exists) and the
+  `geometry` section (threaded as required params into `CameraProjector` / `reconcile` /
+  `fuse_entities`, but no pipeline stage calls them yet). Their values already live here
+  and in the generator — there are no in-code defaults — so wiring the consumer is the
+  only remaining step. The deep calibration anchor/agreement constants remain structural.
 - The offline pipeline applies **no preprocessing by default**; `preprocessing`
   parameterises the HUD/scene chain factories for when a chain is enabled.

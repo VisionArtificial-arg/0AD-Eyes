@@ -457,10 +457,13 @@
       ".bmp",
       ".tif",
       ".tiff"
-    ]
+    ],
+    "live_monitor": 1,
+    "live_fps": 30.0
   },
   "geometry": {
     "camera_error_tolerance": 1.0,
-    "fusion_agreement_scale": 1.0
+    "fusion_agreement_scale": 1.0,
+    "fusion_match_radius": 20.0
   }
 }

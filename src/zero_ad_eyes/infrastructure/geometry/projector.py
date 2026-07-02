@@ -33,8 +33,8 @@ class CameraProjector:
         self,
         screen_to_world: Homography,
         *,
+        error_tolerance: float,
         reprojection_error: float = 0.0,
-        error_tolerance: float = 1.0,
         provenance: Provenance = Provenance.CLASSICAL,
     ) -> None:
         if error_tolerance <= 0.0:
@@ -53,7 +53,7 @@ class CameraProjector:
         screen_points: list[ScreenPoint],
         world_points: list[WorldPoint],
         *,
-        error_tolerance: float = 1.0,
+        error_tolerance: float,
         provenance: Provenance = Provenance.CLASSICAL,
     ) -> CameraProjector:
         """Recover the projector from screen↔world correspondences (F1).

@@ -276,6 +276,12 @@ def default_config() -> Config:
         acquisition=AcquisitionSettings(
             offline_fps=30.0,
             image_extensions=(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"),
+            live_monitor=1,
+            live_fps=30.0,
         ),
-        geometry=GeometrySettings(camera_error_tolerance=1.0, fusion_agreement_scale=1.0),
+        geometry=GeometrySettings(
+            camera_error_tolerance=1.0,
+            fusion_agreement_scale=1.0,
+            fusion_match_radius=20.0,
+        ),
     )

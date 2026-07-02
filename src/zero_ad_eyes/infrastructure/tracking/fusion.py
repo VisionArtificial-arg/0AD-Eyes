@@ -40,15 +40,16 @@ def _sq_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
     return dx * dx + dy * dy
 
 
-def _fuse_world_pos(higher: Entity, lower: Entity) -> WorldPoint | None:
+def _fuse_world_pos(higher: Entity, lower: Entity, agreement_scale: float) -> WorldPoint | None:
     """Fuse the two world positions (the one spatial attribute).
 
     When both sources carry a position, delegate the blend to the F3 geometry
     reconciler (:func:`geometry.fusion.reconcile`) — G5 is the single home for
     fusion and treats the two-estimate spatial case as F3's pure-geometry special
-    case, rather than winner-take-all. Only the reconciled *point* is used here; the
-    entity's overall confidence stays the winner's value (attribute-level G5 policy,
-    below). When only one source has a position, backfill from whichever has it.
+    case, rather than winner-take-all. ``agreement_scale`` (the G5 1/e distance
+    discount) comes from the ``geometry`` config. Only the reconciled *point* is used
+    here; the entity's overall confidence stays the winner's value (attribute-level G5
+    policy, below). When only one source has a position, backfill from whichever has it.
 
     Eventual target: inverse-variance weighting once each source exposes a position
     covariance; ``reconcile``'s confidence-weighted mean is the documented heuristic
@@ -57,21 +58,25 @@ def _fuse_world_pos(higher: Entity, lower: Entity) -> WorldPoint | None:
 
     if higher.world_pos is not None and lower.world_pos is not None:
         fused_point, _ = reconcile(
-            higher.world_pos, higher.confidence, lower.world_pos, lower.confidence
+            higher.world_pos,
+            higher.confidence,
+            lower.world_pos,
+            lower.confidence,
+            agreement_scale=agreement_scale,
         )
         return fused_point
     return higher.world_pos if higher.world_pos is not None else lower.world_pos
 
 
-def resolve_conflict(primary: Entity, secondary: Entity) -> Entity:
+def resolve_conflict(primary: Entity, secondary: Entity, *, agreement_scale: float) -> Entity:
     """Confidence-weighted merge of two entities held to be the same thing (G5).
 
     Each attribute is taken from the more-confident source, falling back to the
     other when the winner's value is missing/unknown — except the world position,
-    which is *blended* via the F3 reconciler (see :func:`_fuse_world_pos`). The
-    persistent ``entity_id`` is always the primary's (the tracked identity);
-    ``staleness`` takes the freshest (minimum) of the two; the fused confidence keeps
-    the winning value but is re-tagged ``FUSED``.
+    which is *blended* via the F3 reconciler (see :func:`_fuse_world_pos`), using the
+    ``geometry`` config's ``agreement_scale``. The persistent ``entity_id`` is always
+    the primary's (the tracked identity); ``staleness`` takes the freshest (minimum)
+    of the two; the fused confidence keeps the winning value but is re-tagged ``FUSED``.
     """
 
     higher, lower = (
@@ -86,7 +91,7 @@ def resolve_conflict(primary: Entity, secondary: Entity) -> Entity:
         kind=higher.kind,
         ownership=ownership,
         entity_type=higher.entity_type if higher.entity_type is not None else lower.entity_type,
-        world_pos=_fuse_world_pos(higher, lower),
+        world_pos=_fuse_world_pos(higher, lower, agreement_scale),
         screen_bbox=higher.screen_bbox if higher.screen_bbox is not None else lower.screen_bbox,
         health=higher.health if higher.health is not None else lower.health,
         selected=higher.selected or lower.selected,
@@ -99,14 +104,16 @@ def fuse_entities(
     primary: Sequence[Entity],
     hints: Sequence[Entity],
     *,
-    match_radius: float = 20.0,
+    match_radius: float,
+    agreement_scale: float,
 ) -> tuple[Entity, ...]:
     """Fuse ``primary`` entities with ``hints`` into one coherent set (G4).
 
     A hint is greedily matched to the nearest primary within ``match_radius`` (same
     coordinate frame) and merged via :func:`resolve_conflict`. Hints that match no
     primary are appended unchanged — they represent things known only to the other
-    source (e.g. a minimap blip currently off the main viewport).
+    source (e.g. a minimap blip currently off the main viewport). Both ``match_radius``
+    (G4) and ``agreement_scale`` (G5) come from the ``geometry`` config.
     """
 
     radius_sq = match_radius * match_radius
@@ -129,7 +136,9 @@ def fuse_entities(
         if best_idx is None:
             merged.append(hint)
         else:
-            merged[best_idx] = resolve_conflict(primary[best_idx], hint)
+            merged[best_idx] = resolve_conflict(
+                primary[best_idx], hint, agreement_scale=agreement_scale
+            )
             consumed.add(best_idx)
 
     return tuple(merged)

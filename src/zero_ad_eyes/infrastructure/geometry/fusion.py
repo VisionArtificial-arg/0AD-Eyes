@@ -31,7 +31,7 @@ def reconcile(
     minimap: WorldPoint,
     minimap_confidence: Confidence,
     *,
-    agreement_scale: float = 1.0,
+    agreement_scale: float,
 ) -> tuple[WorldPoint, Confidence]:
     """Fuse a main-view and a minimap world estimate into one (F3).
 

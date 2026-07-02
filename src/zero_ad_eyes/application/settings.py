@@ -461,27 +461,31 @@ class PipelineSettings(BaseModel):
 
 
 class AcquisitionSettings(BaseModel):
-    """Offline replay tuning (EPIC A). Live-capture knobs are added when wired."""
+    """Acquisition tuning (EPIC A) — offline replay + live capture."""
 
     model_config = ConfigDict(frozen=True)
 
     offline_fps: float = Field(gt=0.0)  # image-folder replay pacing
     image_extensions: tuple[str, ...]
+    live_monitor: int = Field(ge=0)  # mss monitor index (0 = the all-monitors virtual)
+    live_fps: float = Field(gt=0.0)  # live-capture target pacing
 
 
 class GeometrySettings(BaseModel):
-    """World-projection / fusion tuning (EPIC F/G5), config-driven (NF7).
+    """World-projection / fusion tuning (EPIC F/G4/G5), config-driven (NF7).
 
-    Declaration home for the geometry knobs. ``reconcile`` and ``CameraProjector``
-    already accept these as parameters; they are not yet read here because the fusion
-    / F-series path is not in the offline composition root — they get wired to this
-    section when fusion is integrated.
+    The home for the geometry/fusion knobs. Its values reach the geometry helpers
+    (``CameraProjector``, ``reconcile``) and the tracker fusion (``fuse_entities``)
+    as required parameters — there are no in-code defaults; a composition root that
+    uses those helpers passes ``cfg.geometry.*``. No offline pipeline stage consumes
+    them yet, but the values live here (and in the generator), not in the code.
     """
 
     model_config = ConfigDict(frozen=True)
 
     camera_error_tolerance: float = Field(gt=0.0)  # F4 1/e error scale
     fusion_agreement_scale: float = Field(gt=0.0)  # G5 1/e distance discount
+    fusion_match_radius: float = Field(gt=0.0)  # G4 hint-association radius (screen/world units)
 
 
 class Paths(BaseModel):

@@ -1,10 +1,10 @@
-"""Config guards for offline acquisition (Approach B, P3)."""
+"""Config guards for acquisition — offline replay + live capture (Approach B, P3)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from zero_ad_eyes.infrastructure.acquisition import ImageFolderSource
+from zero_ad_eyes.infrastructure.acquisition import ImageFolderSource, ScreenCaptureSource
 from zero_ad_eyes.infrastructure.config import load_config
 from zero_ad_eyes.interface.cli import _offline_source
 from zero_ad_eyes.interface.default_config import default_config
@@ -15,6 +15,7 @@ def test_defaults_match_historical() -> None:
     a = default_config().acquisition
     assert a.offline_fps == 30.0
     assert a.image_extensions == (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
+    assert (a.live_monitor, a.live_fps) == (1, 30.0)
 
 
 def test_config_file_threads_offline_fps(tmp_path: Path) -> None:
@@ -27,3 +28,14 @@ def test_config_file_threads_offline_fps(tmp_path: Path) -> None:
 
     assert isinstance(source, ImageFolderSource)
     assert source._fps == 10.0
+
+
+def test_config_threads_live_capture_knobs_into_source() -> None:
+    config = load_config(
+        default_config(),
+        env={"ZAE_ACQUISITION__LIVE_MONITOR": "2", "ZAE_ACQUISITION__LIVE_FPS": "12.0"},
+    )
+    source = ScreenCaptureSource.from_settings(config.acquisition)
+
+    # Built from config, not in-code defaults: the pacer runs at the configured fps.
+    assert source._pacer._interval == 1.0 / 12.0
