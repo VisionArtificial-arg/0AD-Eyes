@@ -10,8 +10,9 @@ shadow (E3's hard requirement): hue stays stable while brightness swings, so we
 threshold tightly on hue/saturation but leave value generous. Reds straddle the
 hue wrap-around (0/180), hence a colour may carry several bands.
 
-The palette is pure configuration — swap ``DEFAULT_PALETTE`` for a colour-blind
-palette without touching the segmentation code.
+The palette is pure configuration — built at the composition root from the
+``perception`` config section via :meth:`PlayerPalette.from_settings`; swap in a
+colour-blind palette without touching the segmentation code.
 """
 
 from __future__ import annotations
@@ -31,10 +32,10 @@ class HsvBand(BaseModel):
 
     h_lo: int = Field(ge=0, le=179)
     h_hi: int = Field(ge=0, le=179)
-    s_lo: int = Field(default=70, ge=0, le=255)
-    s_hi: int = Field(default=255, ge=0, le=255)
-    v_lo: int = Field(default=50, ge=0, le=255)
-    v_hi: int = Field(default=255, ge=0, le=255)
+    s_lo: int = Field(ge=0, le=255)
+    s_hi: int = Field(ge=0, le=255)
+    v_lo: int = Field(ge=0, le=255)
+    v_hi: int = Field(ge=0, le=255)
 
     def mask(self, hsv: np.ndarray) -> np.ndarray:
         """Binary (0/255) mask of pixels falling inside this band."""
@@ -74,8 +75,7 @@ class PlayerPalette(BaseModel):
         """Build the cv2-backed palette from its pure-data config (Approach B).
 
         The config (``application.settings``) owns the values; this boundary mapping
-        rehydrates them into the OpenCV-capable infra types. Field-for-field, so a
-        default config yields exactly the historical ``DEFAULT_PALETTE``.
+        rehydrates them into the OpenCV-capable infra types, field-for-field.
         """
 
         return cls(
@@ -98,10 +98,3 @@ class PlayerPalette(BaseModel):
                 for color in palette.colors
             )
         )
-
-
-# Default relative palette. SELF=blue, ALLY=green, ENEMY=red (hue-wrapped),
-# GAIA=yellow. Deliberately conservative saturation/value floors so weakly tinted
-# terrain does not register as a player colour. Derived from the config default
-# (application.settings.OwnershipPalette) so there is a single source of truth.
-DEFAULT_PALETTE = PlayerPalette.from_settings(OwnershipPalette())

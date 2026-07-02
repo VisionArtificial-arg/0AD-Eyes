@@ -28,7 +28,9 @@ def _pipeline(n_frames: int) -> PerceptionPipeline:
         )
         for i in range(n_frames)
     ]
-    return PerceptionPipeline(InMemoryFrameSource(frames), StubPerceptionModel())
+    return PerceptionPipeline(
+        InMemoryFrameSource(frames), StubPerceptionModel(), recalibrate_interval=30
+    )
 
 
 def test_latency_stats_math() -> None:
@@ -106,7 +108,8 @@ def test_pipeline_records_per_stage_timings() -> None:
     pipeline = PerceptionPipeline(
         InMemoryFrameSource(frames),
         StubPerceptionModel(),
-        tracker=IouTracker(),
+        recalibrate_interval=30,
+        tracker=IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85),
         profiler=timings,
     )
 

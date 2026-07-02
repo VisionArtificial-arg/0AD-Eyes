@@ -29,12 +29,12 @@ class HudLayoutRatios(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     # Top resource/phase bar: full-width band hugging the top edge.
-    top_bar_height: float = Field(default=0.035, gt=0.0, le=1.0)
+    top_bar_height: float = Field(gt=0.0, le=1.0)
     # Bottom-left minimap: a square whose side is a fraction of frame *height*.
-    minimap_side: float = Field(default=0.20, gt=0.0, le=1.0)
+    minimap_side: float = Field(gt=0.0, le=1.0)
     # Bottom-centre selection panel: fraction of width x fraction of height.
-    selection_width: float = Field(default=0.34, gt=0.0, le=1.0)
-    selection_height: float = Field(default=0.16, gt=0.0, le=1.0)
+    selection_width: float = Field(gt=0.0, le=1.0)
+    selection_height: float = Field(gt=0.0, le=1.0)
 
     def top_bar(self, width: int, height: int, ui_scale: float, anchor: float | None) -> ScreenBBox:
         frac = anchor if anchor is not None else self.top_bar_height * ui_scale

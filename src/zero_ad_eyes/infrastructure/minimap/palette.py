@@ -6,9 +6,9 @@ from a player colour to an :class:`Ownership` is **session state**, not a consta
 (risk R4). So the palette is a first-class, configurable object calibrated per
 session (EPIC B/B3) rather than literals scattered through the detector.
 
-The :meth:`MinimapPalette.default` palette is *illustrative* (a conventional
-blue-self / green-ally / red-enemy / white-gaia scheme) to make the reader runnable
-out of the box; production wiring replaces it with the calibrated one.
+The palette is built at the composition root from the ``minimap`` config section via
+:meth:`MinimapPalette.from_settings`; production wiring supplies the per-session
+calibrated colours (EPIC B/B3).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from zero_ad_eyes.application.settings import MinimapPaletteEntry, MinimapSettings
+from zero_ad_eyes.application.settings import MinimapPaletteEntry
 from zero_ad_eyes.domain.taxonomy import Ownership
 
 
@@ -66,12 +66,6 @@ class MinimapPalette:
                 for entry in entries
             )
         )
-
-    @classmethod
-    def default(cls) -> MinimapPalette:
-        """The illustrative default, derived from the config default (single source)."""
-
-        return cls.from_settings(MinimapSettings().palette)
 
     def colors(self) -> np.ndarray:
         """Entry colours stacked as a ``(K, 3)`` float array (BGR)."""

@@ -22,7 +22,7 @@ def test_classifies_the_three_brightness_tiers() -> None:
     region[:, 20:] = 220  # bright ⇒ visible
     seg = _full_segmentation(region)
 
-    grid = FogClassifier(rows=1, cols=3).classify(seg)
+    grid = FogClassifier(rows=1, cols=3, unexplored_max=25.0, visible_min=140.0).classify(seg)
 
     assert grid.rows == 1
     assert grid.cols == 3
@@ -33,7 +33,9 @@ def test_classifies_the_three_brightness_tiers() -> None:
 
 def test_count_helper_totals_cells() -> None:
     region = np.zeros((16, 16, 3), dtype=np.uint8)  # entirely dark
-    grid = FogClassifier(rows=4, cols=4).classify(_full_segmentation(region))
+    grid = FogClassifier(rows=4, cols=4, unexplored_max=25.0, visible_min=140.0).classify(
+        _full_segmentation(region)
+    )
     assert grid.count(FogState.UNEXPLORED) == 16
 
 
@@ -41,10 +43,10 @@ def test_inactive_cells_are_unexplored() -> None:
     region = np.full((16, 16, 3), 255, dtype=np.uint8)  # all bright
     mask = np.zeros((16, 16), dtype=np.uint8)  # but nothing active
     seg = Segmentation(region=region, mask=mask, origin_x=0, origin_y=0)
-    grid = FogClassifier(rows=2, cols=2).classify(seg)
+    grid = FogClassifier(rows=2, cols=2, unexplored_max=25.0, visible_min=140.0).classify(seg)
     assert grid.count(FogState.UNEXPLORED) == 4
 
 
 def test_rejects_non_positive_grid() -> None:
     with pytest.raises(ValueError):
-        FogClassifier(rows=0, cols=4)
+        FogClassifier(rows=0, cols=4, unexplored_max=25.0, visible_min=140.0)

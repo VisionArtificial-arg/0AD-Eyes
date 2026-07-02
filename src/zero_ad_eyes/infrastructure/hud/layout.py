@@ -4,9 +4,9 @@ Calibration (EPIC B) locates the *whole* ``top_bar`` and ``selection_panel``
 boxes. This module subdivides those boxes into the individual counters/swatches
 the reader OCRs, expressed as fractions of the parent box so a single layout
 works across resolutions and UI scales (A4). All fractions are configuration
-(NF7): the defaults below encode the standard 0 A.D. top-bar ordering
-(food, wood, stone, metal, population, then phase on the right) and are the
-project's *assumption*, not a measured fact — override per theme if needed.
+(NF7): they are supplied at the composition root from the ``hud`` config section
+(the generated default encodes the standard 0 A.D. top-bar ordering — food, wood,
+stone, metal, population, then phase on the right), never baked in here.
 """
 
 from __future__ import annotations
@@ -37,26 +37,21 @@ class FractionalRegion(BaseModel):
         )
 
 
-# Full-height text slots; the number sits centred vertically in the bar.
-def _slot(x: float, width: float) -> FractionalRegion:
-    return FractionalRegion(x=x, y=0.0, width=width, height=1.0)
-
-
 class TopBarLayout(BaseModel):
     """Where each top-bar element sits, as fractions of the ``top_bar`` box."""
 
     model_config = ConfigDict(frozen=True)
 
-    food: FractionalRegion = _slot(0.03, 0.10)
-    wood: FractionalRegion = _slot(0.15, 0.10)
-    stone: FractionalRegion = _slot(0.27, 0.10)
-    metal: FractionalRegion = _slot(0.39, 0.10)
-    population: FractionalRegion = _slot(0.51, 0.12)
-    phase: FractionalRegion = _slot(0.80, 0.18)
+    food: FractionalRegion
+    wood: FractionalRegion
+    stone: FractionalRegion
+    metal: FractionalRegion
+    population: FractionalRegion
+    phase: FractionalRegion
     # Own-player colour swatch: the small coloured emblem, upper-left of the bar.
-    swatch: FractionalRegion = FractionalRegion(x=0.0, y=0.2, width=0.025, height=0.6)
+    swatch: FractionalRegion
     # Civ emblem / name region (best-effort OCR), right of the swatch.
-    civ: FractionalRegion = _slot(0.66, 0.13)
+    civ: FractionalRegion
 
 
 class SelectionPanelLayout(BaseModel):
@@ -64,6 +59,6 @@ class SelectionPanelLayout(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    entity_type: FractionalRegion = FractionalRegion(x=0.05, y=0.05, width=0.9, height=0.25)
-    health: FractionalRegion = FractionalRegion(x=0.05, y=0.35, width=0.5, height=0.25)
-    queue: FractionalRegion = FractionalRegion(x=0.05, y=0.7, width=0.9, height=0.28)
+    entity_type: FractionalRegion
+    health: FractionalRegion
+    queue: FractionalRegion

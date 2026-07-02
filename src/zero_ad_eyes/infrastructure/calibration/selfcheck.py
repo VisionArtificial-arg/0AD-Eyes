@@ -23,7 +23,6 @@ from .anchors import bottom_band_fraction, top_band_fraction
 # rather than cliff-edging.
 _AGREEMENT_TOLERANCE = 0.6
 _EPS = 1e-9
-_DEFAULT_MATCH_THRESHOLD = 0.5
 # Resolution matches but no anchors could be recovered to confirm the layout: we can
 # neither confirm nor deny, so report a deliberately middling confidence.
 _UNVERIFIABLE_CONFIDENCE = 0.5
@@ -40,8 +39,8 @@ class LayoutSelfCheck:
     def __init__(
         self,
         *,
-        match_threshold: float = _DEFAULT_MATCH_THRESHOLD,
-        use_anchors: bool = True,
+        match_threshold: float,
+        use_anchors: bool,
     ) -> None:
         self._match_threshold = match_threshold
         self._use_anchors = use_anchors

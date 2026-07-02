@@ -28,9 +28,9 @@ from .segmentation import Segmentation
 class ViewportDetector:
     """Extracts the camera footprint rectangle from the minimap (D5)."""
 
-    white_min: int = 200
-    min_area: int = 64
-    min_side: int = 8
+    white_min: int
+    min_area: int
+    min_side: int
 
     def detect(
         self, segmentation: Segmentation, projector: MinimapProjector

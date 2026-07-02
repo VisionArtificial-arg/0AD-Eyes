@@ -22,7 +22,6 @@ from zero_ad_eyes.domain.detections import Detection, Detections
 from zero_ad_eyes.domain.geometry import ScreenBBox
 
 from .resources import (
-    DEFAULT_RESOURCE_CUES,
     ResourceCue,
     detect_resource_nodes,
     resource_cues_from_settings,
@@ -35,10 +34,11 @@ class ClassicalPerceptionModel:
 
     def __init__(
         self,
+        *,
+        resource_cues: Sequence[ResourceCue],
+        detect_resources: bool,
         template_bank: TemplateBank | None = None,
-        resource_cues: Sequence[ResourceCue] = DEFAULT_RESOURCE_CUES,
         resource_templates: Sequence[Template] = (),
-        detect_resources: bool = True,
     ) -> None:
         self._template_bank = template_bank if template_bank is not None else TemplateBank()
         self._resource_cues = tuple(resource_cues)

@@ -39,16 +39,14 @@ class ClassicalHudReader:
 
     def __init__(
         self,
-        ocr: OcrEngine | None = None,
+        ocr: OcrEngine,
         *,
-        top_bar_layout: TopBarLayout | None = None,
-        selection_layout: SelectionPanelLayout | None = None,
+        top_bar_layout: TopBarLayout,
+        selection_layout: SelectionPanelLayout,
     ) -> None:
-        self._ocr = ocr if ocr is not None else TesseractOcrEngine()
-        self._top_bar = top_bar_layout if top_bar_layout is not None else TopBarLayout()
-        self._selection = (
-            selection_layout if selection_layout is not None else SelectionPanelLayout()
-        )
+        self._ocr = ocr
+        self._top_bar = top_bar_layout
+        self._selection = selection_layout
 
     @classmethod
     def from_settings(cls, settings: HudSettings) -> ClassicalHudReader:

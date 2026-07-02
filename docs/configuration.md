@@ -6,22 +6,49 @@ config tree. Nothing needs a code change to retune; you edit a JSON file, set an
 environment variable, or both.
 
 - The **types** live in `application/settings.py` (`Config` and its sections) — pure
-  `pydantic` value objects, no I/O, no OpenCV.
+  `pydantic` value objects, no I/O, no OpenCV. They are **defaultless**: every field is
+  required and carries only its validation range. There are no tuning values buried in
+  the code.
+- The **default values** all live in one place — the generator
+  `interface/default_config.py::default_config()`. It is the single source of truth for
+  "the defaults", surfaced to you through the `config` CLI commands (below) so you never
+  read source to discover a default.
 - The **loader** lives in `infrastructure/config` (`load_config` / `save_config`).
+  `load_config` layers a file and env onto a supplied *base* config (the CLI injects the
+  generated defaults as that base).
 - The full default tree, expanded, is [`docs/config.example.json`](./config.example.json).
-  It is generated from `Config()` and kept in sync by a snapshot test, so it is always
-  an accurate, copy-pasteable template.
+  It is generated from `default_config()` and kept in sync by a snapshot test, so it is
+  always an accurate, copy-pasteable template — or regenerate it yourself with
+  `zero-ad-eyes config init`.
+
+## The `config` commands
+
+The defaults are data, not code — inspect and generate them without opening a source file:
+
+```bash
+zero-ad-eyes config init [PATH]      # write the default config (default: config.json)
+zero-ad-eyes config init --force     #   overwrite an existing file
+zero-ad-eyes config show             # print the effective config as JSON (defaults)
+zero-ad-eyes config show --config my.json   # ... defaults + your file + ZAE_* env
+zero-ad-eyes config validate my.json # check a file against the schema (exit != 0 on error)
+```
+
+`config init` gives you the whole tree to edit down; `config show` prints exactly what a
+run would use after layering; `config validate` fails loudly on a typo'd key or an
+out-of-range value before you depend on it.
 
 ## Precedence
 
 Lowest to highest:
 
 ```
-built-in defaults   <   JSON file   <   environment variables
+generated defaults (base)   <   JSON file   <   environment variables
 ```
 
-Anything you don't set keeps its default. You never write the whole tree — only the
-leaves you want to change.
+Anything you don't set keeps its generated default. You never write the whole tree —
+only the leaves you want to change. With no `--config` and no env overrides, a command
+runs on the generated defaults held in memory; nothing is written to disk unless you ask
+(`config init`).
 
 ## Using a config file
 
@@ -90,16 +117,17 @@ nearest-HSV-window match; override the `enemy` colour's bands:
 {
   "perception": {
     "ownership_palette": { "colors": [
-      { "name": "blue",   "ownership": "self",  "bands": [ { "h_lo": 100, "h_hi": 130 } ] },
-      { "name": "orange", "ownership": "enemy", "bands": [ { "h_lo": 11,  "h_hi": 25 } ] }
+      { "name": "blue",   "ownership": "self",  "bands": [ { "h_lo": 100, "h_hi": 130, "s_lo": 70, "s_hi": 255, "v_lo": 50, "v_hi": 255 } ] },
+      { "name": "orange", "ownership": "enemy", "bands": [ { "h_lo": 11,  "h_hi": 25,  "s_lo": 70, "s_hi": 255, "v_lo": 50, "v_hi": 255 } ] }
     ] }
   }
 }
 ```
 
 Note: a palette override replaces the whole `colors` list (lists are not merged
-element-wise), so include every colour you want, not just the changed one. Omitted
-band fields (`s_lo`, `s_hi`, `v_lo`, `v_hi`) fall back to their per-field defaults.
+element-wise), so include every colour you want, not just the changed one. Each HSV
+window is required in full — all six of `h_lo`, `h_hi`, `s_lo`, `s_hi`, `v_lo`, `v_hi`
+(there are no per-field defaults). Copy a band from `config show` and edit it.
 
 **Tighten the accuracy gate for a run:**
 
@@ -121,13 +149,14 @@ classmethod at the composition root (`interface/cli.py::_build_offline_pipeline`
 into the OpenCV-backed adapter *at that boundary*, so the pipeline itself stays
 config-free and the `application` ring never imports OpenCV.
 
-To persist a starting config, dump the defaults and edit down:
+To persist a starting config, dump the defaults and edit down — either via the CLI
+(`zero-ad-eyes config init my.json`) or in code:
 
 ```python
-from zero_ad_eyes.application.settings import Config
 from zero_ad_eyes.infrastructure.config import save_config
+from zero_ad_eyes.interface.default_config import default_config
 
-save_config(Config(), "my.json")   # then delete everything you don't want to override
+save_config(default_config(), "my.json")  # then delete everything you don't want to override
 ```
 
 ## Notes / limits

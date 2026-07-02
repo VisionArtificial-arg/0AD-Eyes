@@ -33,10 +33,10 @@ def _bright_saturated(hsv: np.ndarray, s_min: int, v_min: int) -> np.ndarray:
 def locate_health_bar(
     frame: Frame,
     entity_bbox: ScreenBBox,
-    max_offset: int = 20,
-    s_min: int = 60,
-    v_min: int = 60,
-    min_run: float = 0.15,
+    max_offset: int,
+    s_min: int,
+    v_min: int,
+    min_run: float,
 ) -> ScreenBBox | None:
     """Find the health bar in the band above ``entity_bbox``.
 
@@ -85,7 +85,7 @@ def locate_health_bar(
     )
 
 
-def measure_fill(frame: Frame, bar_bbox: ScreenBBox, s_min: int = 60, v_min: int = 60) -> float:
+def measure_fill(frame: Frame, bar_bbox: ScreenBBox, s_min: int, v_min: int) -> float:
     """Fraction of the bar's columns carrying a bright pixel, clamped to [0, 1]."""
 
     image = frame.image
@@ -110,10 +110,10 @@ def measure_fill(frame: Frame, bar_bbox: ScreenBBox, s_min: int = 60, v_min: int
 def read_health(
     frame: Frame,
     entity_bbox: ScreenBBox,
-    max_offset: int = 20,
-    s_min: int = 60,
-    v_min: int = 60,
-    min_run: float = 0.15,
+    max_offset: int,
+    s_min: int,
+    v_min: int,
+    min_run: float,
 ) -> float | None:
     """Locate the health bar above ``entity_bbox`` and return its fill fraction.
 

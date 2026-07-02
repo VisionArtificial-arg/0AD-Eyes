@@ -6,8 +6,8 @@ downstream consumers reason in world space, never in minimap pixels.
 
 Assumed world extent is **configurable** (:class:`WorldExtent`), not baked in: a
 0 A.D. map is square with an engine-defined size, and different maps differ, so the
-extent must be supplied per session (analogous to calibration, EPIC B). The default
-is an illustrative unit-less square; a real session substitutes the map's size.
+extent must be supplied per session (analogous to calibration, EPIC B) — there is no
+in-code default; the composition root provides it from the ``minimap`` config.
 
 Coordinate conventions (documented, because they are load-bearing):
 
@@ -34,21 +34,21 @@ class WorldExtent:
     bottom-left corner (because +y points up). Width/height are the world span.
     """
 
-    origin_x: float = 0.0
-    origin_y: float = 0.0
-    width: float = 1024.0
-    height: float = 1024.0
-    flip_y: bool = True
+    origin_x: float
+    origin_y: float
+    width: float
+    height: float
+    flip_y: bool
 
     def __post_init__(self) -> None:
         if self.width <= 0.0 or self.height <= 0.0:
             raise ValueError("world extent width/height must be positive")
 
     @classmethod
-    def square(cls, size: float = 1024.0, *, flip_y: bool = True) -> WorldExtent:
+    def square(cls, size: float, *, flip_y: bool = True) -> WorldExtent:
         """A square world of ``size`` engine units (the common 0 A.D. case)."""
 
-        return cls(width=size, height=size, flip_y=flip_y)
+        return cls(origin_x=0.0, origin_y=0.0, width=size, height=size, flip_y=flip_y)
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class MinimapProjector:
 
     region_width: int
     region_height: int
-    extent: WorldExtent = WorldExtent()
+    extent: WorldExtent
 
     def __post_init__(self) -> None:
         if self.region_width <= 0 or self.region_height <= 0:

@@ -16,14 +16,21 @@ from pathlib import Path
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
 from zero_ad_eyes.application.ports import FrameSource, PerceptionModel, StageProfiler
 from zero_ad_eyes.application.settings import AcquisitionSettings, Config
-from zero_ad_eyes.infrastructure.config.config import load_config
+from zero_ad_eyes.infrastructure.config.config import load_config, save_config
 from zero_ad_eyes.infrastructure.model.stub_adapter import StubPerceptionModel
+from zero_ad_eyes.interface.default_config import default_config
 
 
 def _load_config(path: str | None) -> Config:
-    """Load the typed config from ``path`` (defaults + JSON + env), or pure defaults."""
+    """Load the typed config: the generated defaults, then the file, then env (NF7).
 
-    return load_config(path)
+    The models carry no defaults; :func:`default_config` is the single source of
+    default values and is injected as the base the file/env layer onto. With no
+    ``--config`` and no env overrides this is exactly the generated defaults, in
+    memory — nothing is written to disk.
+    """
+
+    return load_config(default_config(), path)
 
 
 def _offline_source(recording: str, acquisition: AcquisitionSettings) -> FrameSource:
@@ -71,8 +78,8 @@ def _build_offline_pipeline(
     swap in here identically.
 
     This is the composition root where config is read (NF7): each adapter is built
-    ``from_settings`` of the typed :class:`Config` (defaults when none supplied), so
-    the pipeline itself stays config-free — it only ever sees ports.
+    ``from_settings`` of the typed :class:`Config` (the generated defaults when none
+    supplied), so the pipeline itself stays config-free — it only ever sees ports.
     """
 
     from zero_ad_eyes.infrastructure.calibration import HudCalibrator, LayoutSelfCheck
@@ -82,7 +89,7 @@ def _build_offline_pipeline(
     from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector, IouTracker
 
-    cfg = config or Config()
+    cfg = config if config is not None else default_config()
 
     return PerceptionPipeline(
         _offline_source(recording, cfg.acquisition),
@@ -255,7 +262,12 @@ def _run_bench(
         )
     else:
         source = _synthetic_source(frames, width, height)
-        pipeline = PerceptionPipeline(source, StubPerceptionModel(), profiler=timings)  # type: ignore[arg-type]
+        pipeline = PerceptionPipeline(
+            source,  # type: ignore[arg-type]
+            StubPerceptionModel(),
+            recalibrate_interval=config.pipeline.recalibrate_interval,
+            profiler=timings,
+        )
 
     report = benchmark(
         pipeline,
@@ -285,6 +297,58 @@ def _run_bench(
     passed = report.meets_latency and report.meets_throughput
     print(f"  verdict: {'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
+
+
+def _run_config(
+    *,
+    action: str,
+    path: str | None,
+    config: str | None,
+    force: bool,
+) -> int:
+    """The ``config`` command group: surface the generated defaults as an editable file.
+
+    The system holds no defaults except :func:`default_config`; these subcommands are
+    the UI over it — ``init`` writes it, ``show`` prints the effective tree, ``validate``
+    checks a file against the schema. Users discover and edit defaults as data, never
+    by reading source (NF7).
+    """
+
+    from pydantic import ValidationError
+
+    if action == "init":
+        destination = Path(path) if path is not None else Path("config.json")
+        if destination.exists() and not force:
+            print(f"config: {destination} already exists (pass --force to overwrite)")
+            return 1
+        save_config(default_config(), destination)
+        print(f"config: wrote default config to {destination}")
+        return 0
+
+    if action == "show":
+        # Effective config: defaults, then the file (if any), then env overrides.
+        print(_load_config(config).model_dump_json(indent=2))
+        return 0
+
+    if action == "validate":
+        assert path is not None  # required by the argument parser
+        source = Path(path)
+        if not source.exists():
+            print(f"config: {source} does not exist")
+            return 2
+        try:
+            _load_config(str(source))
+        except ValidationError as error:
+            print(f"config: {source} is invalid")
+            print(str(error))
+            return 1
+        except json.JSONDecodeError as error:
+            print(f"config: {source} is not valid JSON: {error}")
+            return 1
+        print(f"config: {source} is valid")
+        return 0
+
+    return 2
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -357,6 +421,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
     )
 
+    config_cmd = sub.add_parser(
+        "config", help="generate / inspect / validate the config file (NF7)"
+    )
+    config_sub = config_cmd.add_subparsers(dest="config_command", required=True)
+    cfg_init = config_sub.add_parser("init", help="write the default config to a file")
+    cfg_init.add_argument(
+        "path", nargs="?", default=None, help="destination file (default: config.json)"
+    )
+    cfg_init.add_argument("--force", action="store_true", help="overwrite an existing file")
+    cfg_show = config_sub.add_parser("show", help="print the effective config as JSON")
+    cfg_show.add_argument(
+        "--config",
+        default=None,
+        help="a JSON config to layer on the defaults (else the pure defaults); env ZAE_* applies",
+    )
+    cfg_validate = config_sub.add_parser(
+        "validate", help="validate a config file against the schema"
+    )
+    cfg_validate.add_argument("path", help="the JSON config file to validate")
+
     args = parser.parse_args(argv)
 
     if args.command == "run":
@@ -368,7 +452,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             source = _synthetic_source(args.frames, args.width, args.height)
             model = _perception_model(args.detector, config)
-            pipeline = PerceptionPipeline(source, model)  # type: ignore[arg-type]
+            pipeline = PerceptionPipeline(
+                source,  # type: ignore[arg-type]
+                model,
+                recalibrate_interval=config.pipeline.recalibrate_interval,
+            )
         for world_model in pipeline.run():
             print(world_model.model_dump_json())
         return 0
@@ -393,6 +481,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             height=args.height,
             warmup=args.warmup,
             config=_load_config(args.config),
+        )
+
+    if args.command == "config":
+        return _run_config(
+            action=args.config_command,
+            path=getattr(args, "path", None),
+            config=getattr(args, "config", None),
+            force=getattr(args, "force", False),
         )
 
     parser.error(f"unknown command: {args.command}")

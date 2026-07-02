@@ -24,8 +24,6 @@ from zero_ad_eyes.domain.world_model import FrameMeta
 CaptureFactory = Callable[[], Any]
 ImageReader = Callable[[str], Any]
 
-_DEFAULT_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
-
 
 class VideoFileSource:
     """Replays a video file frame by frame as a ``FrameSource``."""
@@ -85,8 +83,8 @@ class ImageFolderSource:
         self,
         folder: str | Path,
         *,
-        extensions: tuple[str, ...] = _DEFAULT_IMAGE_EXTENSIONS,
-        fps: float = 30.0,
+        extensions: tuple[str, ...],
+        fps: float,
         source: str | None = None,
         reader: ImageReader = cv2.imread,
     ) -> None:

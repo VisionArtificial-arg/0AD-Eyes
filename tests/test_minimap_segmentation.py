@@ -13,7 +13,7 @@ def test_crops_the_calibrated_region_with_offset() -> None:
     frame[150:190, 10:70] = (255, 0, 0)  # a blue block where the minimap sits
     bbox = ScreenBBox(x=10, y=150, width=60, height=40)
 
-    seg = MinimapSegmenter().segment(frame, bbox)
+    seg = MinimapSegmenter(MinimapShape.SQUARE).segment(frame, bbox)
 
     assert seg is not None
     assert (seg.width, seg.height) == (60, 40)
@@ -42,11 +42,18 @@ def test_disc_mask_excludes_corners_keeps_centre() -> None:
 
 def test_off_frame_bbox_returns_none() -> None:
     frame = np.zeros((50, 50, 3), dtype=np.uint8)
-    assert MinimapSegmenter().segment(frame, ScreenBBox(x=100, y=100, width=10, height=10)) is None
+    assert (
+        MinimapSegmenter(MinimapShape.SQUARE).segment(
+            frame, ScreenBBox(x=100, y=100, width=10, height=10)
+        )
+        is None
+    )
 
 
 def test_bbox_is_clamped_to_frame_bounds() -> None:
     frame = np.zeros((50, 50, 3), dtype=np.uint8)
-    seg = MinimapSegmenter().segment(frame, ScreenBBox(x=40, y=40, width=40, height=40))
+    seg = MinimapSegmenter(MinimapShape.SQUARE).segment(
+        frame, ScreenBBox(x=40, y=40, width=40, height=40)
+    )
     assert seg is not None
     assert (seg.width, seg.height) == (10, 10)

@@ -21,7 +21,9 @@ def test_corners_map_to_world_extent_with_flipped_y() -> None:
 
 def test_flip_y_off_keeps_y_growing_downward() -> None:
     proj = MinimapProjector(
-        region_width=10, region_height=10, extent=WorldExtent(width=10.0, height=10.0, flip_y=False)
+        region_width=10,
+        region_height=10,
+        extent=WorldExtent(origin_x=0.0, origin_y=0.0, width=10.0, height=10.0, flip_y=False),
     )
     assert proj.to_world(0.0, 0.0) == WorldPoint(x=0.0, y=0.0)
     assert proj.to_world(10.0, 10.0) == WorldPoint(x=10.0, y=10.0)
@@ -29,7 +31,9 @@ def test_flip_y_off_keeps_y_growing_downward() -> None:
 
 def test_to_world_and_to_pixel_are_inverse() -> None:
     proj = MinimapProjector(
-        region_width=128, region_height=96, extent=WorldExtent(origin_x=5.0, origin_y=-3.0)
+        region_width=128,
+        region_height=96,
+        extent=WorldExtent(origin_x=5.0, origin_y=-3.0, width=1024.0, height=1024.0, flip_y=True),
     )
     for px, py in [(0.0, 0.0), (40.0, 12.0), (128.0, 96.0), (63.5, 47.25)]:
         back = proj.to_pixel(proj.to_world(px, py))
@@ -48,6 +52,6 @@ def test_configurable_origin_offsets_the_world() -> None:
 
 def test_rejects_non_positive_sizes() -> None:
     with pytest.raises(ValueError):
-        MinimapProjector(region_width=0, region_height=10)
+        MinimapProjector(region_width=0, region_height=10, extent=WorldExtent.square(10.0))
     with pytest.raises(ValueError):
-        WorldExtent(width=0.0, height=10.0)
+        WorldExtent(origin_x=0.0, origin_y=0.0, width=0.0, height=10.0, flip_y=True)

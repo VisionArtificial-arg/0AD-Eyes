@@ -25,7 +25,7 @@ def _entity(
 
 
 def test_appearance_and_disappearance() -> None:
-    detector = EventDetector()
+    detector = EventDetector(combat_drop=0.05, depletion_health=0.02)
 
     born = detector.detect((_entity(0),), frame_id=0)
     assert [e.kind for e in born] == [EventKind.APPEARED]
@@ -38,7 +38,7 @@ def test_appearance_and_disappearance() -> None:
 
 
 def test_combat_on_health_drop() -> None:
-    detector = EventDetector(combat_drop=0.05)
+    detector = EventDetector(combat_drop=0.05, depletion_health=0.02)
     detector.detect((_entity(0, health=1.0),), frame_id=0)
     events = detector.detect((_entity(0, health=0.7),), frame_id=1)
 
@@ -48,13 +48,13 @@ def test_combat_on_health_drop() -> None:
 
 
 def test_small_health_jitter_is_not_combat() -> None:
-    detector = EventDetector(combat_drop=0.05)
+    detector = EventDetector(combat_drop=0.05, depletion_health=0.02)
     detector.detect((_entity(0, health=1.0),), frame_id=0)
     assert detector.detect((_entity(0, health=0.98),), frame_id=1) == ()
 
 
 def test_resource_depletion() -> None:
-    detector = EventDetector(depletion_health=0.02)
+    detector = EventDetector(combat_drop=0.05, depletion_health=0.02)
     detector.detect((_entity(0, kind=EntityKind.RESOURCE_NODE, health=0.3),), frame_id=0)
     events = detector.detect((_entity(0, kind=EntityKind.RESOURCE_NODE, health=0.0),), frame_id=1)
 
@@ -62,7 +62,7 @@ def test_resource_depletion() -> None:
 
 
 def test_state_change_models_build_complete() -> None:
-    detector = EventDetector()
+    detector = EventDetector(combat_drop=0.05, depletion_health=0.02)
     detector.detect((_entity(0, kind=EntityKind.BUILDING, entity_type="scaffold"),), frame_id=0)
     events = detector.detect(
         (_entity(0, kind=EntityKind.BUILDING, entity_type="house"),), frame_id=1
@@ -74,7 +74,7 @@ def test_state_change_models_build_complete() -> None:
 
 
 def test_events_are_deterministically_ordered() -> None:
-    detector = EventDetector()
+    detector = EventDetector(combat_drop=0.05, depletion_health=0.02)
     detector.detect((_entity(2), _entity(5)), frame_id=0)
     # id 2 leaves, id 1 appears → sorted by (entity_id, kind)
     events = detector.detect((_entity(1), _entity(5)), frame_id=1)
@@ -89,7 +89,7 @@ def test_classical_adapter_maps_to_domain_events() -> None:
     from zero_ad_eyes.domain.events import EventKind as DomainEventKind
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
 
-    adapter = ClassicalEventDetector()
+    adapter = ClassicalEventDetector(EventDetector(combat_drop=0.05, depletion_health=0.02))
 
     born = adapter.detect((_entity(0),), frame_id=0)
     assert [e.kind for e in born] == [DomainEventKind.UNIT_APPEARED]

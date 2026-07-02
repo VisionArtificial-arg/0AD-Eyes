@@ -6,11 +6,56 @@ import numpy as np
 
 from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.application.ports import MinimapReader
+from zero_ad_eyes.application.settings import (
+    BgrColorSetting,
+    BlipSettings,
+    FogSettings,
+    MinimapPaletteEntry,
+    MinimapSettings,
+    TerritorySettings,
+    ViewportSettings,
+    WorldExtentSettings,
+)
 from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.confidence import Provenance
 from zero_ad_eyes.domain.geometry import ScreenBBox
+from zero_ad_eyes.domain.taxonomy import Ownership
 from zero_ad_eyes.domain.world_model import FrameMeta
 from zero_ad_eyes.infrastructure.minimap import ClassicalMinimapReader
+
+
+def _settings() -> MinimapSettings:
+    return MinimapSettings(
+        palette=(
+            MinimapPaletteEntry(
+                label="self", color=BgrColorSetting(b=235, g=90, r=40), ownership=Ownership.SELF
+            ),
+            MinimapPaletteEntry(
+                label="ally", color=BgrColorSetting(b=60, g=200, r=60), ownership=Ownership.ALLY
+            ),
+            MinimapPaletteEntry(
+                label="enemy", color=BgrColorSetting(b=40, g=40, r=220), ownership=Ownership.ENEMY
+            ),
+            MinimapPaletteEntry(
+                label="gaia",
+                color=BgrColorSetting(b=235, g=235, r=235),
+                ownership=Ownership.GAIA,
+            ),
+        ),
+        world_extent=WorldExtentSettings(
+            origin_x=0.0, origin_y=0.0, width=1024.0, height=1024.0, flip_y=True
+        ),
+        fog=FogSettings(rows=16, cols=16, unexplored_max=25.0, visible_min=140.0),
+        blips=BlipSettings(tolerance=70.0, min_area=1, max_area=60, confidence=0.8),
+        territory=TerritorySettings(tolerance=90.0, min_area=64),
+        viewport=ViewportSettings(white_min=200, min_area=64, min_side=8),
+        disc_shape=False,
+        region_confidence=0.9,
+    )
+
+
+def _reader() -> ClassicalMinimapReader:
+    return ClassicalMinimapReader.from_settings(_settings())
 
 
 def _frame(image: np.ndarray, frame_id: int = 0) -> Frame:
@@ -24,7 +69,7 @@ def _frame(image: np.ndarray, frame_id: int = 0) -> Frame:
 
 
 def test_reader_satisfies_the_minimap_reader_port() -> None:
-    assert isinstance(ClassicalMinimapReader(), MinimapReader)
+    assert isinstance(_reader(), MinimapReader)
 
 
 def test_returns_classical_model_when_region_present() -> None:
@@ -33,7 +78,7 @@ def test_returns_classical_model_when_region_present() -> None:
         width=300, height=200, minimap=ScreenBBox(x=10, y=150, width=48, height=48)
     )
 
-    model = ClassicalMinimapReader().read(_frame(image), calibration)
+    model = _reader().read(_frame(image), calibration)
 
     assert model.confidence.provenance is Provenance.CLASSICAL
     assert model.confidence.value > 0.0
@@ -46,7 +91,7 @@ def test_read_populates_domain_fog_when_region_present() -> None:
         width=300, height=200, minimap=ScreenBBox(x=10, y=150, width=48, height=48)
     )
 
-    model = ClassicalMinimapReader().read(_frame(image), calibration)
+    model = _reader().read(_frame(image), calibration)
 
     assert model.fog is not None
     assert model.fog.rows * model.fog.cols == len(model.fog.cells) * len(model.fog.cells[0])
@@ -59,7 +104,7 @@ def test_read_populates_domain_territory_when_region_present() -> None:
         width=300, height=200, minimap=ScreenBBox(x=10, y=150, width=48, height=48)
     )
 
-    model = ClassicalMinimapReader().read(_frame(image), calibration)
+    model = _reader().read(_frame(image), calibration)
 
     # An empty territory map is valid; the contract is that the field is populated
     # (not None) whenever the minimap is calibrated, with coverage in [0, 1].
@@ -71,7 +116,7 @@ def test_returns_unknown_when_no_minimap_calibrated() -> None:
     image = np.zeros((200, 300, 3), dtype=np.uint8)
     calibration = Calibration(width=300, height=200, minimap=None)
 
-    model = ClassicalMinimapReader().read(_frame(image), calibration)
+    model = _reader().read(_frame(image), calibration)
 
     assert model.blips == ()
     assert model.viewport is None
@@ -81,7 +126,7 @@ def test_returns_unknown_when_no_minimap_calibrated() -> None:
 def test_side_channels_return_none_without_calibration() -> None:
     image = np.zeros((200, 300, 3), dtype=np.uint8)
     calibration = Calibration(width=300, height=200, minimap=None)
-    reader = ClassicalMinimapReader()
+    reader = _reader()
 
     frame = _frame(image)
     assert reader.read_territory(frame, calibration) is None
@@ -95,7 +140,7 @@ def test_fog_side_channel_reads_the_calibrated_region() -> None:
         width=300, height=200, minimap=ScreenBBox(x=10, y=150, width=48, height=48)
     )
 
-    grid = ClassicalMinimapReader().read_fog(_frame(image), calibration)
+    grid = _reader().read_fog(_frame(image), calibration)
 
     assert grid is not None
     assert grid.rows * grid.cols > 0

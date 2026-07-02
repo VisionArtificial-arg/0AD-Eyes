@@ -32,7 +32,7 @@ def test_extracts_the_camera_rectangle_corners() -> None:
 
     seg = _full_segmentation(region)
     proj = _projector(seg)
-    rect = ViewportDetector().detect(seg, proj)
+    rect = ViewportDetector(white_min=200, min_area=64, min_side=8).detect(seg, proj)
 
     assert rect is not None
     tl = proj.to_world(20.0, 25.0)
@@ -46,11 +46,17 @@ def test_extracts_the_camera_rectangle_corners() -> None:
 def test_no_viewport_returns_none() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
     seg = _full_segmentation(region)
-    assert ViewportDetector().detect(seg, _projector(seg)) is None
+    assert (
+        ViewportDetector(white_min=200, min_area=64, min_side=8).detect(seg, _projector(seg))
+        is None
+    )
 
 
 def test_small_white_blip_is_not_a_viewport() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
     cv2.circle(region, (40, 40), 2, (255, 255, 255), thickness=-1)
     seg = _full_segmentation(region)
-    assert ViewportDetector().detect(seg, _projector(seg)) is None
+    assert (
+        ViewportDetector(white_min=200, min_area=64, min_side=8).detect(seg, _projector(seg))
+        is None
+    )

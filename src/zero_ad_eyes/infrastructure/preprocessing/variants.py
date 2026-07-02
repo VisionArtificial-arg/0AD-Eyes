@@ -27,15 +27,16 @@ from .roi import GateMode, RoiGate
 
 
 def hud_pipeline(
-    region: ScreenBBox | None = None, *, settings: HudPipelineSettings | None = None
+    region: ScreenBBox | None = None, *, settings: HudPipelineSettings
 ) -> PreprocessingPipeline:
     """A HUD-tuned preprocessing chain (P1), parameterised by config (NF7).
 
     When ``region`` is given, the frame is masked to it first so downstream HUD
-    parsing ignores the scene. Default ``settings`` reproduce the historical chain.
+    parsing ignores the scene. ``settings`` are supplied from the ``preprocessing``
+    config section at the composition root.
     """
 
-    cfg = settings or HudPipelineSettings()
+    cfg = settings
     steps: list[PreprocessStep] = []
     if region is not None:
         steps.append(RoiGate(region, mode=GateMode.MASK))
@@ -44,10 +45,10 @@ def hud_pipeline(
     return PreprocessingPipeline(steps)
 
 
-def scene_pipeline(*, settings: ScenePipelineSettings | None = None) -> PreprocessingPipeline:
+def scene_pipeline(*, settings: ScenePipelineSettings) -> PreprocessingPipeline:
     """A scene-tuned preprocessing chain (P1), parameterised by config (NF7)."""
 
-    cfg = settings or ScenePipelineSettings()
+    cfg = settings
     return PreprocessingPipeline(
         [
             BilateralFilter(

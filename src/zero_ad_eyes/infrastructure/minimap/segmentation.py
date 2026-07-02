@@ -6,8 +6,9 @@ area** inside it, so later stages never mistake the surrounding HUD chrome (fram
 buttons) for map content.
 
 0 A.D.'s minimap is square, so :attr:`MinimapShape.SQUARE` (the whole crop) is the
-default. :attr:`MinimapShape.DISC` inscribes a circle for skins/mods that render a
-round minimap — kept configurable rather than assumed (NF7).
+usual choice; :attr:`MinimapShape.DISC` inscribes a circle for skins/mods that render
+a round minimap. The shape is supplied per session from the ``minimap`` config
+(``disc_shape``), never assumed in code (NF7).
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ class Segmentation:
 class MinimapSegmenter:
     """Crops the calibrated minimap region and masks its active area (D1)."""
 
-    def __init__(self, shape: MinimapShape = MinimapShape.SQUARE) -> None:
+    def __init__(self, shape: MinimapShape) -> None:
         self._shape = shape
 
     def segment(self, image: np.ndarray, bbox: ScreenBBox) -> Segmentation | None:

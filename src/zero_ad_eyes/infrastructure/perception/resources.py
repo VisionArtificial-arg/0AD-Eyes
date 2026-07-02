@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 
 from zero_ad_eyes.application.frames import Frame
-from zero_ad_eyes.application.settings import PerceptionSettings, ResourceCueSetting
+from zero_ad_eyes.application.settings import ResourceCueSetting
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.detections import Detection
 from zero_ad_eyes.domain.geometry import ScreenBBox, ScreenPoint
@@ -36,7 +36,7 @@ class ResourceCue:
 
     entity_type: str
     bands: tuple[HsvBand, ...]
-    min_area: int = 20
+    min_area: int
 
     @classmethod
     def from_settings(cls, cue: ResourceCueSetting) -> ResourceCue:
@@ -55,13 +55,6 @@ def resource_cues_from_settings(
     """Map the pure-data cue list into cv2-capable cues at the boundary."""
 
     return tuple(ResourceCue.from_settings(cue) for cue in cues)
-
-
-# Coarse, overlap-tolerant signatures (recall over precision), derived from the
-# config default so there is a single source of truth.
-DEFAULT_RESOURCE_CUES: tuple[ResourceCue, ...] = resource_cues_from_settings(
-    PerceptionSettings().resource_cues
-)
 
 
 def _cue_mask(hsv: np.ndarray, cue: ResourceCue) -> np.ndarray:
@@ -88,7 +81,7 @@ def _detection_from_contour(contour: np.ndarray, cue: ResourceCue, ox: int, oy: 
 
 def detect_resource_nodes(
     frame: Frame,
-    cues: Sequence[ResourceCue] = DEFAULT_RESOURCE_CUES,
+    cues: Sequence[ResourceCue],
     templates: Sequence[Template] = (),
     roi: ScreenBBox | None = None,
 ) -> tuple[Detection, ...]:

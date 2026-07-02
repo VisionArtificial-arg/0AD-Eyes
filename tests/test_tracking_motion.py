@@ -46,7 +46,7 @@ def test_motion_still_when_trajectory_too_short() -> None:
 
 
 def test_tracker_reports_rightward_motion_for_moving_entity() -> None:
-    tracker = IouTracker()
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85)
     tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     tracker.update(_dets(1, _det(5, 0)), make_frame(1))  # +5px in x, overlapping
 

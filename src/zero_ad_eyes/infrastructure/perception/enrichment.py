@@ -32,7 +32,7 @@ from zero_ad_eyes.domain.taxonomy import Ownership
 
 from .health import read_health
 from .ownership import assign_ownership
-from .palette import DEFAULT_PALETTE, PlayerPalette
+from .palette import PlayerPalette
 from .state import read_state_cues
 
 
@@ -42,15 +42,15 @@ class ClassicalEntityEnricher:
     def __init__(
         self,
         *,
-        ownership_palette: PlayerPalette | None = None,
-        ownership_min_fraction: float = 0.02,
-        health: HealthReadSettings | None = None,
-        state: StateCueSettings | None = None,
+        ownership_palette: PlayerPalette,
+        ownership_min_fraction: float,
+        health: HealthReadSettings,
+        state: StateCueSettings,
     ) -> None:
-        self._ownership_palette = ownership_palette or DEFAULT_PALETTE
+        self._ownership_palette = ownership_palette
         self._ownership_min_fraction = ownership_min_fraction
-        self._health = health or HealthReadSettings()
-        self._state = state or StateCueSettings()
+        self._health = health
+        self._state = state
 
     @classmethod
     def from_settings(cls, settings: PerceptionSettings) -> ClassicalEntityEnricher:

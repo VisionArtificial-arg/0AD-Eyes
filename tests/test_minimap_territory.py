@@ -6,12 +6,29 @@ import numpy as np
 
 from zero_ad_eyes.domain.taxonomy import Ownership
 from zero_ad_eyes.infrastructure.minimap import (
+    BgrColor,
     MinimapPalette,
     MinimapProjector,
+    PaletteEntry,
     Segmentation,
     TerritoryExtractor,
     WorldExtent,
 )
+
+
+def _palette() -> MinimapPalette:
+    return MinimapPalette(
+        entries=(
+            PaletteEntry("self", BgrColor(235, 90, 40), Ownership.SELF),
+            PaletteEntry("ally", BgrColor(60, 200, 60), Ownership.ALLY),
+            PaletteEntry("enemy", BgrColor(40, 40, 220), Ownership.ENEMY),
+            PaletteEntry("gaia", BgrColor(235, 235, 235), Ownership.GAIA),
+        )
+    )
+
+
+def _extractor() -> TerritoryExtractor:
+    return TerritoryExtractor(palette=_palette(), tolerance=90.0, min_area=64)
 
 
 def _full_segmentation(region: np.ndarray) -> Segmentation:
@@ -29,14 +46,14 @@ def _projector(seg: Segmentation) -> MinimapProjector:
 
 def test_extracts_two_player_territories() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
-    palette = MinimapPalette.default()
+    palette = _palette()
     self_c = palette.entries[0].color
     enemy_c = palette.entries[2].color
     region[5:35, 5:35] = (self_c.b, self_c.g, self_c.r)
     region[45:75, 45:75] = (enemy_c.b, enemy_c.g, enemy_c.r)
 
     seg = _full_segmentation(region)
-    territory = TerritoryExtractor.with_default_palette().extract(seg, _projector(seg))
+    territory = _extractor().extract(seg, _projector(seg))
 
     owners = sorted(r.ownership for r in territory.regions)
     assert owners == sorted([Ownership.SELF, Ownership.ENEMY])
@@ -45,11 +62,11 @@ def test_extracts_two_player_territories() -> None:
 
 def test_borders_trace_the_territory_edge() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
-    ally = MinimapPalette.default().entries[1].color
+    ally = _palette().entries[1].color
     region[20:60, 20:60] = (ally.b, ally.g, ally.r)
 
     seg = _full_segmentation(region)
-    territory = TerritoryExtractor.with_default_palette().extract(seg, _projector(seg))
+    territory = _extractor().extract(seg, _projector(seg))
 
     assert territory.borders.shape == (80, 80)
     # The border is a hollow ring: edge pixels are set, the interior is not.
@@ -60,6 +77,6 @@ def test_borders_trace_the_territory_edge() -> None:
 def test_no_territory_yields_empty_map() -> None:
     region = np.zeros((40, 40, 3), dtype=np.uint8)
     seg = _full_segmentation(region)
-    territory = TerritoryExtractor.with_default_palette().extract(seg, _projector(seg))
+    territory = _extractor().extract(seg, _projector(seg))
     assert territory.regions == ()
     assert not territory.borders.any()

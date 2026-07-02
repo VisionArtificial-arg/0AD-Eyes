@@ -24,7 +24,7 @@ def _dets(frame_id: int, *detections: Detection) -> Detections:
 
 
 def test_birth_is_tentative_then_confirmed_after_min_hits() -> None:
-    tracker = IouTracker(min_hits=2)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=2, max_staleness=15, decay=0.85)
     tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     assert tracker.statuses() == {0: TrackStatus.TENTATIVE}
 
@@ -33,7 +33,7 @@ def test_birth_is_tentative_then_confirmed_after_min_hits() -> None:
 
 
 def test_disappearance_kills_the_track_with_zero_memory() -> None:
-    tracker = IouTracker(max_staleness=0)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=0, decay=0.85)
     born = tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     assert len(born) == 1
 
@@ -43,7 +43,7 @@ def test_disappearance_kills_the_track_with_zero_memory() -> None:
 
 
 def test_single_missed_frame_does_not_kill_when_memory_allows() -> None:
-    tracker = IouTracker(max_staleness=2)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=2, decay=0.85)
     tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     lost = tracker.update(_dets(1), make_frame(1))
 
@@ -53,7 +53,7 @@ def test_single_missed_frame_does_not_kill_when_memory_allows() -> None:
 
 
 def test_reacquired_track_returns_to_confirmed_with_same_id() -> None:
-    tracker = IouTracker(max_staleness=3, min_hits=1)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=3, decay=0.85)
     tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     tracker.update(_dets(1), make_frame(1))  # missed → LOST
     reacquired = tracker.update(_dets(2, _det(0, 0)), make_frame(2))

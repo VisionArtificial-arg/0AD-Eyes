@@ -37,14 +37,10 @@ class BlipDetector:
     """Finds coloured blips and classifies each by owner colour (D2)."""
 
     palette: MinimapPalette
-    tolerance: float = 70.0
-    min_area: int = 1
-    max_area: int = 60
-    confidence: float = 0.8
-
-    @classmethod
-    def with_default_palette(cls) -> BlipDetector:
-        return cls(palette=MinimapPalette.default())
+    tolerance: float
+    min_area: int
+    max_area: int
+    confidence: float
 
     def detect(self, segmentation: Segmentation, projector: MinimapProjector) -> tuple[Blip, ...]:
         labels = self._label_pixels(segmentation)

@@ -27,6 +27,7 @@ from zero_ad_eyes.application.settings import OverlaySettings
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.minimap import Blip, FogState, MinimapModel
 from zero_ad_eyes.domain.world_model import WorldModel
+from zero_ad_eyes.interface.default_config import default_config
 
 # A fog grid is a row-major 2-D grid of visibility states (§4.5). Kept as a plain
 # nested sequence so the overlay does not force a numpy shape on its callers.
@@ -42,15 +43,16 @@ def render(
 ) -> Any:
     """Return a copy of ``frame.image`` with the world model drawn on top.
 
-    ``settings`` defaults to :class:`OverlaySettings` defaults (no disk/env I/O, so
-    rendering stays pure and deterministic — NF5). ``fog``, when given, tints a
-    grid over the minimap panel; it is a separate argument because per-cell fog is
-    not (yet) carried inside :class:`WorldModel`.
+    ``settings`` defaults to the generated overlay defaults
+    (:func:`interface.default_config.default_config` — the single source of default
+    values; no disk/env I/O, so rendering stays pure and deterministic, NF5). ``fog``,
+    when given, tints a grid over the minimap panel; it is a separate argument because
+    per-cell fog is not (yet) carried inside :class:`WorldModel`.
     """
 
     import cv2  # local import: keep module import headless-safe
 
-    cfg = settings if settings is not None else OverlaySettings()
+    cfg = settings if settings is not None else default_config().overlay
     canvas = frame.image.copy()
 
     for entity in world_model.entities:

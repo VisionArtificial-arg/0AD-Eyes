@@ -22,7 +22,9 @@ from .conftest import make_frame
 
 def test_pipeline_produces_one_world_model_per_frame() -> None:
     frames = [make_frame(i) for i in range(3)]
-    pipeline = PerceptionPipeline(InMemoryFrameSource(frames), StubPerceptionModel())
+    pipeline = PerceptionPipeline(
+        InMemoryFrameSource(frames), StubPerceptionModel(), recalibrate_interval=30
+    )
 
     results = list(pipeline.run())
 

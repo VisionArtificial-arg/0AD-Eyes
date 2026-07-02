@@ -49,12 +49,8 @@ class TerritoryExtractor:
     """Segments broad player-tinted areas and their borders (D3)."""
 
     palette: MinimapPalette
-    tolerance: float = 90.0
-    min_area: int = 64
-
-    @classmethod
-    def with_default_palette(cls) -> TerritoryExtractor:
-        return cls(palette=MinimapPalette.default())
+    tolerance: float
+    min_area: int
 
     def extract(self, segmentation: Segmentation, projector: MinimapProjector) -> TerritoryMap:
         region = segmentation.region.astype(np.float32)

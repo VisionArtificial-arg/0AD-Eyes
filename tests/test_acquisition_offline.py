@@ -68,7 +68,12 @@ def test_image_folder_source_reads_sorted_images(tmp_path) -> None:
     for name in ("frame_002.png", "frame_000.png", "frame_001.png"):
         cv2.imwrite(str(tmp_path / name), np.zeros((6, 9, 3), dtype=np.uint8))
 
-    source = ImageFolderSource(tmp_path, fps=5.0, source="rec")
+    source = ImageFolderSource(
+        tmp_path,
+        extensions=(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"),
+        fps=5.0,
+        source="rec",
+    )
     frames = list(source.frames())
 
     assert [f.meta.frame_id for f in frames] == [0, 1, 2]
@@ -79,4 +84,8 @@ def test_image_folder_source_reads_sorted_images(tmp_path) -> None:
 
 def test_image_folder_source_rejects_non_positive_fps() -> None:
     with pytest.raises(ValueError):
-        ImageFolderSource("somewhere", fps=0.0)
+        ImageFolderSource(
+            "somewhere",
+            extensions=(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"),
+            fps=0.0,
+        )

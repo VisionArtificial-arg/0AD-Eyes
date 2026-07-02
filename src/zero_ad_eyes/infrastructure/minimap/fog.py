@@ -46,10 +46,10 @@ class FogGrid:
 class FogClassifier:
     """Classifies minimap cells into unexplored / explored / visible (D4)."""
 
-    rows: int = 16
-    cols: int = 16
-    unexplored_max: float = 25.0  # mean brightness below this ⇒ never seen (black)
-    visible_min: float = 140.0  # mean brightness at/above this ⇒ currently visible
+    rows: int
+    cols: int
+    unexplored_max: float  # mean brightness below this ⇒ never seen (black)
+    visible_min: float  # mean brightness at/above this ⇒ currently visible
 
     def __post_init__(self) -> None:
         if self.rows <= 0 or self.cols <= 0:

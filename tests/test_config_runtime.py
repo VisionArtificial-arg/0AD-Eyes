@@ -7,14 +7,17 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from zero_ad_eyes.application.settings import PerfSettings, PipelineSettings
+from zero_ad_eyes.application.settings import PerfSettings
 from zero_ad_eyes.infrastructure.config import load_config
 from zero_ad_eyes.interface.cli import _build_offline_pipeline
+from zero_ad_eyes.interface.default_config import default_config
 
 
 def test_perf_and_pipeline_defaults_match_historical() -> None:
-    assert (PerfSettings().latency_target_ms, PerfSettings().throughput_target_fps) == (66.0, 15.0)
-    assert PipelineSettings().recalibrate_interval == 30
+    # Guard the generated defaults against the frozen historical NF1/NF2 + interval.
+    config = default_config()
+    assert (config.perf.latency_target_ms, config.perf.throughput_target_fps) == (66.0, 15.0)
+    assert config.pipeline.recalibrate_interval == 30
 
 
 def test_config_file_threads_recalibrate_interval(tmp_path: Path) -> None:
@@ -22,7 +25,7 @@ def test_config_file_threads_recalibrate_interval(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text('{"pipeline": {"recalibrate_interval": 7}}', encoding="utf-8")
 
-    config = load_config(cfg_path, env={})
+    config = load_config(default_config(), cfg_path, env={})
     pipeline = _build_offline_pipeline(str(tmp_path), detector="stub", config=config)
 
     assert pipeline._recalibrate_interval == 7
@@ -43,7 +46,9 @@ def test_config_file_threads_perf_targets_into_benchmark() -> None:
         )
         for i in range(3)
     ]
-    pipeline = PerceptionPipeline(InMemoryFrameSource(frames), StubPerceptionModel())
+    pipeline = PerceptionPipeline(
+        InMemoryFrameSource(frames), StubPerceptionModel(), recalibrate_interval=30
+    )
 
     perf = PerfSettings(latency_target_ms=10.0, throughput_target_fps=99.0)
     report = benchmark(

@@ -37,7 +37,7 @@ def test_iou_and_greedy_match_are_deterministic() -> None:
 
 
 def test_single_object_keeps_stable_id_across_frames() -> None:
-    tracker = IouTracker()
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85)
     e1 = tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     e2 = tracker.update(_dets(1, _det(2, 0)), make_frame(1))  # small move, IoU overlaps
     e3 = tracker.update(_dets(2, _det(4, 0)), make_frame(2))
@@ -47,7 +47,7 @@ def test_single_object_keeps_stable_id_across_frames() -> None:
 
 
 def test_two_objects_get_distinct_stable_ids() -> None:
-    tracker = IouTracker()
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85)
     left, right = _det(0, 0), _det(100, 0)
     first = tracker.update(_dets(0, left, right), make_frame(0))
     second = tracker.update(_dets(1, _det(2, 0), _det(102, 0)), make_frame(1))
@@ -59,7 +59,7 @@ def test_two_objects_get_distinct_stable_ids() -> None:
 
 
 def test_new_detection_births_a_new_id() -> None:
-    tracker = IouTracker()
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85)
     tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     entities = tracker.update(_dets(1, _det(0, 0), _det(200, 0)), make_frame(1))
     assert len(entities) == 2
@@ -67,7 +67,7 @@ def test_new_detection_births_a_new_id() -> None:
 
 
 def test_motion_is_none_on_first_sighting_then_populated() -> None:
-    tracker = IouTracker()
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85)
     (first,) = tracker.update(_dets(0, _det(0, 0)), make_frame(0))
     assert first.motion is None  # one observation → velocity unknown, not fabricated
 
@@ -79,7 +79,7 @@ def test_motion_is_none_on_first_sighting_then_populated() -> None:
 
 
 def test_confidence_and_type_carry_through() -> None:
-    tracker = IouTracker()
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=15, decay=0.85)
     (entity,) = tracker.update(_dets(0, _det(0, 0, kind=EntityKind.BUILDING)), make_frame(0))
     assert entity.kind is EntityKind.BUILDING
     assert entity.confidence.provenance is Provenance.CLASSICAL

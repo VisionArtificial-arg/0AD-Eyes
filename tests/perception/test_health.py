@@ -39,17 +39,17 @@ def _scene(fill_fraction: float, bar_y: int = 24) -> Frame:
 
 
 def test_reads_full_health() -> None:
-    assert read_health(_scene(1.0), ENTITY) == 1.0
+    assert read_health(_scene(1.0), ENTITY, 20, 60, 60, 0.15) == 1.0
 
 
 def test_reads_partial_health() -> None:
-    val = read_health(_scene(0.5), ENTITY)
+    val = read_health(_scene(0.5), ENTITY, 20, 60, 60, 0.15)
     assert val is not None
     assert abs(val - 0.5) <= 0.1
 
 
 def test_reads_low_health() -> None:
-    val = read_health(_scene(0.25), ENTITY)
+    val = read_health(_scene(0.25), ENTITY, 20, 60, 60, 0.15)
     assert val is not None
     assert abs(val - 0.25) <= 0.1
 
@@ -57,13 +57,13 @@ def test_reads_low_health() -> None:
 def test_no_bar_returns_none() -> None:
     img = np.zeros((90, 120, 3), dtype=np.uint8)
     cv2.rectangle(img, (20, 30), (60, 70), (200, 40, 40), -1)
-    assert read_health(_wrap(img), ENTITY) is None
+    assert read_health(_wrap(img), ENTITY, 20, 60, 60, 0.15) is None
 
 
 def test_locate_then_measure_directly() -> None:
     scene = _scene(0.75)
-    bar = locate_health_bar(scene, ENTITY)
+    bar = locate_health_bar(scene, ENTITY, 20, 60, 60, 0.15)
     assert bar is not None
     assert bar.width == ENTITY.width
-    frac = measure_fill(scene, bar)
+    frac = measure_fill(scene, bar, 60, 60)
     assert abs(frac - 0.75) <= 0.1

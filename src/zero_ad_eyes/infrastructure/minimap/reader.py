@@ -39,20 +39,20 @@ class ClassicalMinimapReader:
     def __init__(
         self,
         *,
-        segmenter: MinimapSegmenter | None = None,
-        blip_detector: BlipDetector | None = None,
-        viewport_detector: ViewportDetector | None = None,
-        territory_extractor: TerritoryExtractor | None = None,
-        fog_classifier: FogClassifier | None = None,
-        world_extent: WorldExtent | None = None,
-        region_confidence: float = 0.9,
+        segmenter: MinimapSegmenter,
+        blip_detector: BlipDetector,
+        viewport_detector: ViewportDetector,
+        territory_extractor: TerritoryExtractor,
+        fog_classifier: FogClassifier,
+        world_extent: WorldExtent,
+        region_confidence: float,
     ) -> None:
-        self._segmenter = segmenter or MinimapSegmenter()
-        self._blip_detector = blip_detector or BlipDetector.with_default_palette()
-        self._viewport_detector = viewport_detector or ViewportDetector()
-        self._territory_extractor = territory_extractor or TerritoryExtractor.with_default_palette()
-        self._fog_classifier = fog_classifier or FogClassifier()
-        self._world_extent = world_extent or WorldExtent()
+        self._segmenter = segmenter
+        self._blip_detector = blip_detector
+        self._viewport_detector = viewport_detector
+        self._territory_extractor = territory_extractor
+        self._fog_classifier = fog_classifier
+        self._world_extent = world_extent
         self._region_confidence = region_confidence
 
     @classmethod

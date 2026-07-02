@@ -18,7 +18,7 @@ from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.domain.geometry import ScreenBBox
 from zero_ad_eyes.domain.taxonomy import Ownership
 
-from .palette import DEFAULT_PALETTE, PlayerColor, PlayerPalette
+from .palette import PlayerColor, PlayerPalette
 
 
 def _crop(image: np.ndarray, bbox: ScreenBBox) -> np.ndarray:
@@ -40,8 +40,8 @@ def ownership_mask(frame: Frame, color: PlayerColor) -> np.ndarray:
 def assign_ownership(
     frame: Frame,
     bbox: ScreenBBox,
-    palette: PlayerPalette = DEFAULT_PALETTE,
-    min_fraction: float = 0.02,
+    palette: PlayerPalette,
+    min_fraction: float,
 ) -> tuple[Ownership, float]:
     """Dominant player colour inside ``bbox`` → (ownership, coverage fraction).
 

@@ -31,12 +31,6 @@ from .ports import (
     WorldModelSink,
 )
 
-# Default frames between B4 layout self-checks. The self-check re-runs anchor
-# detection (the dominant calibration cost), so it is amortised over an interval
-# rather than paid every frame; layout changes are rare and need not be caught
-# within a single frame.
-DEFAULT_RECALIBRATE_INTERVAL = 30
-
 
 def _same_resolution(frame: Frame, calibration: Calibration) -> bool:
     """Whether ``frame``'s resolution matches the one a calibration was built for.
@@ -62,7 +56,7 @@ class PerceptionPipeline:
         preprocessor: Preprocessor | None = None,
         calibrator: Calibrator | None = None,
         self_check: LayoutChecker | None = None,
-        recalibrate_interval: int = DEFAULT_RECALIBRATE_INTERVAL,
+        recalibrate_interval: int,
         hud_reader: HudReader | None = None,
         minimap_reader: MinimapReader | None = None,
         tracker: Tracker | None = None,

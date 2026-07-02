@@ -55,7 +55,7 @@ class TrackingEvent(BaseModel):
 class EventDetector:
     """Stateful frame-over-frame differ producing an events list (G8)."""
 
-    def __init__(self, *, combat_drop: float = 0.05, depletion_health: float = 0.02) -> None:
+    def __init__(self, *, combat_drop: float, depletion_health: float) -> None:
         self._combat_drop = combat_drop
         self._depletion_health = depletion_health
         self._previous: dict[int, Entity] = {}
@@ -151,8 +151,8 @@ class ClassicalEventDetector:
     ``detail`` string is a debug aid and is dropped from the domain contract.
     """
 
-    def __init__(self, detector: EventDetector | None = None) -> None:
-        self._detector = detector if detector is not None else EventDetector()
+    def __init__(self, detector: EventDetector) -> None:
+        self._detector = detector
 
     @classmethod
     def from_settings(cls, settings: TrackingSettings) -> ClassicalEventDetector:

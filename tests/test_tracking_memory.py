@@ -24,7 +24,7 @@ def _dets(frame_id: int, *detections: Detection) -> Detections:
 
 
 def test_staleness_increments_each_missed_frame() -> None:
-    tracker = IouTracker(max_staleness=5, decay=1.0)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=5, decay=1.0)
     tracker.update(_dets(0, _det()), make_frame(0))
 
     stalenesses = []
@@ -36,7 +36,7 @@ def test_staleness_increments_each_missed_frame() -> None:
 
 
 def test_confidence_decays_geometrically_while_lost() -> None:
-    tracker = IouTracker(max_staleness=5, decay=0.5)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=5, decay=0.5)
     tracker.update(_dets(0, _det(value=1.0)), make_frame(0))
 
     (miss1,) = tracker.update(_dets(1), make_frame(1))
@@ -48,7 +48,7 @@ def test_confidence_decays_geometrically_while_lost() -> None:
 
 
 def test_track_dies_once_memory_budget_is_exhausted() -> None:
-    tracker = IouTracker(max_staleness=2, decay=1.0)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=2, decay=1.0)
     tracker.update(_dets(0, _det()), make_frame(0))
 
     assert len(tracker.update(_dets(1), make_frame(1))) == 1  # staleness 1
@@ -57,7 +57,7 @@ def test_track_dies_once_memory_budget_is_exhausted() -> None:
 
 
 def test_reobservation_resets_staleness_and_restores_confidence() -> None:
-    tracker = IouTracker(max_staleness=5, decay=0.5)
+    tracker = IouTracker(iou_threshold=0.3, min_hits=1, max_staleness=5, decay=0.5)
     tracker.update(_dets(0, _det(value=1.0)), make_frame(0))
     tracker.update(_dets(1), make_frame(1))  # lost, staleness 1
 

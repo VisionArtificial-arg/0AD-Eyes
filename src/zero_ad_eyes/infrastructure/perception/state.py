@@ -49,9 +49,9 @@ def _clamp_box(image: np.ndarray, bbox: ScreenBBox) -> tuple[int, int, int, int]
 def detect_selection(
     frame: Frame,
     bbox: ScreenBBox,
-    thickness: int = 3,
-    brightness: int = 200,
-    min_fraction: float = 0.4,
+    thickness: int,
+    brightness: int,
+    min_fraction: float,
 ) -> bool:
     """True if a bright ring straddles the entity's border (a selection ring)."""
 
@@ -84,9 +84,9 @@ def detect_selection(
 def detect_construction(
     frame: Frame,
     bbox: ScreenBBox,
-    edge_density_min: float = 0.12,
-    canny_lo: float = 60.0,
-    canny_hi: float = 180.0,
+    edge_density_min: float,
+    canny_lo: float,
+    canny_hi: float,
 ) -> bool:
     """True if the interior is wireframe-busy — a construction scaffold cue."""
 
@@ -103,11 +103,11 @@ def detect_construction(
 def detect_garrison(
     frame: Frame,
     bbox: ScreenBBox,
-    top_fraction: float = 0.35,
-    brightness: int = 200,
-    max_saturation: int = 70,
-    min_badge_area: int = 6,
-    max_badge_width_fraction: float = 0.5,
+    top_fraction: float,
+    brightness: int,
+    max_saturation: int,
+    min_badge_area: int,
+    max_badge_width_fraction: float,
 ) -> bool:
     """True if a small white/grey badge sits near the top (a garrison count)."""
 
@@ -128,17 +128,13 @@ def detect_garrison(
     return False
 
 
-def read_state_cues(
-    frame: Frame, bbox: ScreenBBox, settings: StateCueSettings | None = None
-) -> StateCues:
+def read_state_cues(frame: Frame, bbox: ScreenBBox, settings: StateCueSettings) -> StateCues:
     """Run all three best-effort cues for one entity and bundle the result.
 
-    Knobs come from ``settings`` (config-driven, NF7); default reproduces the former
-    hard-coded thresholds.
+    All knobs come from ``settings`` (config-driven, NF7).
     """
 
-    cfg = settings or StateCueSettings()
-    sel, con, gar = cfg.selection, cfg.construction, cfg.garrison
+    sel, con, gar = settings.selection, settings.construction, settings.garrison
     return StateCues(
         selected=detect_selection(frame, bbox, sel.thickness, sel.brightness, sel.min_fraction),
         under_construction=detect_construction(

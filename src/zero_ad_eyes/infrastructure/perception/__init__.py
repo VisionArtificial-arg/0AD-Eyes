@@ -26,8 +26,8 @@ from .masks import (
 from .model import ClassicalPerceptionModel
 from .occlusion import VisibilityInfo, resolve_occlusions, visible_fraction
 from .ownership import assign_ownership, ownership_mask
-from .palette import DEFAULT_PALETTE, HsvBand, PlayerColor, PlayerPalette
-from .resources import DEFAULT_RESOURCE_CUES, ResourceCue, detect_resource_nodes
+from .palette import HsvBand, PlayerColor, PlayerPalette
+from .resources import ResourceCue, detect_resource_nodes, resource_cues_from_settings
 from .state import (
     StateCues,
     detect_construction,
@@ -45,8 +45,6 @@ from .templates import (
 )
 
 __all__ = [
-    "DEFAULT_PALETTE",
-    "DEFAULT_RESOURCE_CUES",
     "ClassicalEntityEnricher",
     "ClassicalPerceptionModel",
     "Component",
@@ -78,6 +76,7 @@ __all__ = [
     "read_health",
     "read_state_cues",
     "resolve_occlusions",
+    "resource_cues_from_settings",
     "to_binary",
     "visible_fraction",
 ]

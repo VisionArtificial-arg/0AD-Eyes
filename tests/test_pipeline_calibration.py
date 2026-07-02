@@ -47,7 +47,10 @@ def _frame(side: int, frame_id: int) -> Frame:
 
 def _pipeline(frames: list[Frame], calibrator: _CountingCalibrator) -> PerceptionPipeline:
     return PerceptionPipeline(
-        InMemoryFrameSource(frames), StubPerceptionModel(), calibrator=calibrator
+        InMemoryFrameSource(frames),
+        StubPerceptionModel(),
+        recalibrate_interval=30,
+        calibrator=calibrator,
     )
 
 

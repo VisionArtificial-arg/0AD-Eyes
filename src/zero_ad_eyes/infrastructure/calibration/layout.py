@@ -25,14 +25,6 @@ from .anchors import bottom_band_fraction, top_band_fraction
 from .profiles import CalibrationProfileStore
 from .ratios import HudLayoutRatios, clamp
 
-# UI scale is a bounded correction, not an open-ended multiplier: 0 A.D.'s HUD scale
-# lives roughly within these bounds, so an anchor-derived estimate is clamped here to
-# reject spurious detections rather than propagate them into every region.
-_UI_SCALE_MIN = 0.5
-_UI_SCALE_MAX = 3.0
-
-DEFAULT_THEME = "default"
-
 
 class HudCalibrator:
     """A ``Calibrator`` (structural port impl) that discovers the HUD per session.
@@ -44,16 +36,16 @@ class HudCalibrator:
 
     def __init__(
         self,
-        ratios: HudLayoutRatios | None = None,
+        ratios: HudLayoutRatios,
         *,
-        theme: str = DEFAULT_THEME,
+        theme: str,
+        use_anchors: bool,
+        default_ui_scale: float,
+        ui_scale_min: float,
+        ui_scale_max: float,
         store: CalibrationProfileStore | None = None,
-        use_anchors: bool = True,
-        default_ui_scale: float = 1.0,
-        ui_scale_min: float = _UI_SCALE_MIN,
-        ui_scale_max: float = _UI_SCALE_MAX,
     ) -> None:
-        self._ratios = ratios or HudLayoutRatios()
+        self._ratios = ratios
         self._theme = theme
         self._store = store
         self._use_anchors = use_anchors

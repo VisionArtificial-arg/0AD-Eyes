@@ -39,9 +39,9 @@ class TesseractOcrEngine:
     degrades to ``""`` rather than raising, so callers stay alive (NF4).
     """
 
-    def __init__(self, *, config: str = "--psm 7") -> None:
-        # --psm 7 = "treat the image as a single text line", the common case for
-        # a HUD counter. Callers can override per instance.
+    def __init__(self, *, config: str) -> None:
+        # Tesseract page-segmentation config (e.g. "--psm 7" = single text line,
+        # the common case for a HUD counter). Supplied from the ``hud`` config.
         self._config = config
 
     @staticmethod

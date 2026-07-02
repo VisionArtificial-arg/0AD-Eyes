@@ -10,8 +10,36 @@ from zero_ad_eyes.domain.confidence import Provenance
 from zero_ad_eyes.domain.geometry import ScreenBBox
 from zero_ad_eyes.domain.taxonomy import EntityKind
 from zero_ad_eyes.domain.world_model import FrameMeta
-from zero_ad_eyes.infrastructure.perception.resources import detect_resource_nodes
+from zero_ad_eyes.infrastructure.perception.palette import HsvBand
+from zero_ad_eyes.infrastructure.perception.resources import ResourceCue, detect_resource_nodes
 from zero_ad_eyes.infrastructure.perception.templates import Template
+
+# The historical default resource cues, spelled out as explicit literals.
+CUES = (
+    ResourceCue(
+        entity_type="tree",
+        bands=(HsvBand(h_lo=35, h_hi=85, s_lo=40, s_hi=255, v_lo=30, v_hi=255),),
+        min_area=20,
+    ),
+    ResourceCue(
+        entity_type="mine",
+        bands=(HsvBand(h_lo=0, h_hi=179, s_lo=0, s_hi=50, v_lo=50, v_hi=190),),
+        min_area=20,
+    ),
+    ResourceCue(
+        entity_type="bush",
+        bands=(
+            HsvBand(h_lo=0, h_hi=8, s_lo=90, s_hi=255, v_lo=60, v_hi=255),
+            HsvBand(h_lo=168, h_hi=179, s_lo=90, s_hi=255, v_lo=60, v_hi=255),
+        ),
+        min_area=20,
+    ),
+    ResourceCue(
+        entity_type="fauna",
+        bands=(HsvBand(h_lo=9, h_hi=25, s_lo=60, s_hi=200, v_lo=40, v_hi=190),),
+        min_area=20,
+    ),
+)
 
 
 def _wrap(image: np.ndarray) -> Frame:
@@ -33,7 +61,7 @@ def _types(dets: tuple) -> set[str]:
 def test_detects_green_tree() -> None:
     img = _scene()
     cv2.rectangle(img, (10, 10), (40, 40), (30, 180, 30), -1)  # green foliage
-    dets = detect_resource_nodes(_wrap(img))
+    dets = detect_resource_nodes(_wrap(img), CUES)
     assert "tree" in _types(dets)
     tree = next(d for d in dets if d.entity_type == "tree")
     assert tree.kind is EntityKind.RESOURCE_NODE
@@ -44,24 +72,24 @@ def test_detects_green_tree() -> None:
 def test_detects_grey_mine() -> None:
     img = _scene()
     cv2.rectangle(img, (80, 60), (120, 100), (130, 130, 130), -1)  # grey rock
-    assert "mine" in _types(detect_resource_nodes(_wrap(img)))
+    assert "mine" in _types(detect_resource_nodes(_wrap(img), CUES))
 
 
 def test_detects_red_bush() -> None:
     img = _scene()
     cv2.circle(img, (60, 40), 14, (30, 30, 200), -1)  # red berries
-    assert "bush" in _types(detect_resource_nodes(_wrap(img)))
+    assert "bush" in _types(detect_resource_nodes(_wrap(img), CUES))
 
 
 def test_empty_scene_no_detections() -> None:
-    assert detect_resource_nodes(_wrap(_scene())) == ()
+    assert detect_resource_nodes(_wrap(_scene()), CUES) == ()
 
 
 def test_roi_limits_search() -> None:
     img = _scene()
     cv2.rectangle(img, (10, 10), (40, 40), (30, 180, 30), -1)  # tree, outside ROI
     roi = ScreenBBox(x=80.0, y=60.0, width=70.0, height=50.0)
-    assert detect_resource_nodes(_wrap(img), roi=roi) == ()
+    assert detect_resource_nodes(_wrap(img), CUES, roi=roi) == ()
 
 
 def test_template_resource_art() -> None:

@@ -33,10 +33,10 @@ class IouTracker:
     def __init__(
         self,
         *,
-        iou_threshold: float = 0.3,
-        min_hits: int = 1,
-        max_staleness: int = 15,
-        decay: float = 0.85,
+        iou_threshold: float,
+        min_hits: int,
+        max_staleness: int,
+        decay: float,
     ) -> None:
         self._iou_threshold = iou_threshold
         self._min_hits = min_hits

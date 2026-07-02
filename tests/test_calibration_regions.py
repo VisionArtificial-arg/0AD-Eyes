@@ -24,7 +24,9 @@ def _within(box: ScreenBBox, width: int, height: int) -> bool:
 
 def test_ratio_fallback_regions_are_resolution_relative() -> None:
     width, height, ui = 1000, 800, 1.0
-    ratios = HudLayoutRatios()
+    ratios = HudLayoutRatios(
+        top_bar_height=0.035, minimap_side=0.20, selection_width=0.34, selection_height=0.16
+    )
 
     top = ratios.top_bar(width, height, ui, None)
     minimap = ratios.minimap(width, height, ui, None)
@@ -52,7 +54,9 @@ def test_ratio_fallback_regions_are_resolution_relative() -> None:
 
 def test_regions_scale_with_ui_scale() -> None:
     width, height = 1000, 800
-    ratios = HudLayoutRatios()
+    ratios = HudLayoutRatios(
+        top_bar_height=0.035, minimap_side=0.20, selection_width=0.34, selection_height=0.16
+    )
     small = ratios.minimap(width, height, 1.0, None)
     large = ratios.minimap(width, height, 2.0, None)
     assert large.height > small.height
@@ -60,14 +64,18 @@ def test_regions_scale_with_ui_scale() -> None:
 
 def test_anchor_overrides_ratio_for_top_bar() -> None:
     width, height = 1280, 720
-    ratios = HudLayoutRatios()
+    ratios = HudLayoutRatios(
+        top_bar_height=0.035, minimap_side=0.20, selection_width=0.34, selection_height=0.16
+    )
     anchored = ratios.top_bar(width, height, 1.0, 0.08)
     assert anchored.height == pytest.approx(0.08 * height)
 
 
 def test_regions_stay_within_frame_at_extreme_ui_scale() -> None:
     width, height = 640, 480
-    ratios = HudLayoutRatios()
+    ratios = HudLayoutRatios(
+        top_bar_height=0.035, minimap_side=0.20, selection_width=0.34, selection_height=0.16
+    )
     for box in (
         ratios.top_bar(width, height, 5.0, None),
         ratios.minimap(width, height, 5.0, None),
