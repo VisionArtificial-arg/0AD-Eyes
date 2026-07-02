@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from zero_ad_eyes.application.settings import MinimapPaletteEntry, MinimapSettings
 from zero_ad_eyes.domain.taxonomy import Ownership
 
 
@@ -52,15 +53,25 @@ class MinimapPalette:
             raise ValueError("a palette needs at least one entry")
 
     @classmethod
-    def default(cls) -> MinimapPalette:
+    def from_settings(cls, entries: tuple[MinimapPaletteEntry, ...]) -> MinimapPalette:
+        """Build from pure-data config entries (Approach B boundary mapping)."""
+
         return cls(
-            entries=(
-                PaletteEntry("self", BgrColor(235, 90, 40), Ownership.SELF),  # blue
-                PaletteEntry("ally", BgrColor(60, 200, 60), Ownership.ALLY),  # green
-                PaletteEntry("enemy", BgrColor(40, 40, 220), Ownership.ENEMY),  # red
-                PaletteEntry("gaia", BgrColor(235, 235, 235), Ownership.GAIA),  # white/neutral
+            entries=tuple(
+                PaletteEntry(
+                    entry.label,
+                    BgrColor(entry.color.b, entry.color.g, entry.color.r),
+                    entry.ownership,
+                )
+                for entry in entries
             )
         )
+
+    @classmethod
+    def default(cls) -> MinimapPalette:
+        """The illustrative default, derived from the config default (single source)."""
+
+        return cls.from_settings(MinimapSettings().palette)
 
     def colors(self) -> np.ndarray:
         """Entry colours stacked as a ``(K, 3)`` float array (BGR)."""

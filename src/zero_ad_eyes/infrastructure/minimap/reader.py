@@ -16,6 +16,7 @@ Provenance of everything produced here is ``Provenance.CLASSICAL``.
 from __future__ import annotations
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import MinimapSettings
 from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.minimap import FogGrid as DomainFogGrid
@@ -25,8 +26,9 @@ from zero_ad_eyes.domain.minimap import TerritoryRegion as DomainTerritoryRegion
 
 from .blips import BlipDetector
 from .fog import FogClassifier, FogGrid
+from .palette import MinimapPalette
 from .projector import MinimapProjector, WorldExtent
-from .segmentation import MinimapSegmenter, Segmentation
+from .segmentation import MinimapSegmenter, MinimapShape, Segmentation
 from .territory import TerritoryExtractor, TerritoryMap
 from .viewport import ViewportDetector
 
@@ -52,6 +54,48 @@ class ClassicalMinimapReader:
         self._fog_classifier = fog_classifier or FogClassifier()
         self._world_extent = world_extent or WorldExtent()
         self._region_confidence = region_confidence
+
+    @classmethod
+    def from_settings(cls, settings: MinimapSettings) -> ClassicalMinimapReader:
+        """Build the whole D1–D6 chain from pure config (Approach B boundary mapping)."""
+
+        palette = MinimapPalette.from_settings(settings.palette)
+        return cls(
+            segmenter=MinimapSegmenter(
+                MinimapShape.DISC if settings.disc_shape else MinimapShape.SQUARE
+            ),
+            blip_detector=BlipDetector(
+                palette=palette,
+                tolerance=settings.blips.tolerance,
+                min_area=settings.blips.min_area,
+                max_area=settings.blips.max_area,
+                confidence=settings.blips.confidence,
+            ),
+            viewport_detector=ViewportDetector(
+                white_min=settings.viewport.white_min,
+                min_area=settings.viewport.min_area,
+                min_side=settings.viewport.min_side,
+            ),
+            territory_extractor=TerritoryExtractor(
+                palette=palette,
+                tolerance=settings.territory.tolerance,
+                min_area=settings.territory.min_area,
+            ),
+            fog_classifier=FogClassifier(
+                rows=settings.fog.rows,
+                cols=settings.fog.cols,
+                unexplored_max=settings.fog.unexplored_max,
+                visible_min=settings.fog.visible_min,
+            ),
+            world_extent=WorldExtent(
+                origin_x=settings.world_extent.origin_x,
+                origin_y=settings.world_extent.origin_y,
+                width=settings.world_extent.width,
+                height=settings.world_extent.height,
+                flip_y=settings.world_extent.flip_y,
+            ),
+            region_confidence=settings.region_confidence,
+        )
 
     def read(self, frame: Frame, calibration: Calibration) -> MinimapModel:
         segmentation = self._segment(frame, calibration)

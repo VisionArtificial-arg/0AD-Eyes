@@ -183,6 +183,124 @@ class PerceptionSettings(BaseModel):
     ownership_min_fraction: float = Field(default=0.02, ge=0.0, le=1.0)
 
 
+# --------------------------------------------------------------------------- #
+# Minimap tuning — pure DATA (Approach B): the minimap reader's collaborators   #
+# (segmenter, blips D2, territory D3, fog D4, viewport D5, projector D6) read    #
+# their knobs from here; infra builds the cv2 components at the boundary via     #
+# ClassicalMinimapReader.from_settings (see minimap/reader.py).                  #
+# --------------------------------------------------------------------------- #
+
+
+class BgrColorSetting(BaseModel):
+    """A colour in OpenCV BGR byte order (pure data)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    b: int = Field(ge=0, le=255)
+    g: int = Field(ge=0, le=255)
+    r: int = Field(ge=0, le=255)
+
+
+class MinimapPaletteEntry(BaseModel):
+    """One calibrated minimap player colour and the ownership it denotes (D2)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    label: str
+    color: BgrColorSetting
+    ownership: Ownership
+
+
+def _default_minimap_palette() -> tuple[MinimapPaletteEntry, ...]:
+    """Illustrative blue-self / green-ally / red-enemy / white-gaia scheme.
+
+    Mirrors the former infra ``MinimapPalette.default()`` exactly (BGR order).
+    """
+
+    return (
+        MinimapPaletteEntry(
+            label="self", color=BgrColorSetting(b=235, g=90, r=40), ownership=Ownership.SELF
+        ),
+        MinimapPaletteEntry(
+            label="ally", color=BgrColorSetting(b=60, g=200, r=60), ownership=Ownership.ALLY
+        ),
+        MinimapPaletteEntry(
+            label="enemy", color=BgrColorSetting(b=40, g=40, r=220), ownership=Ownership.ENEMY
+        ),
+        MinimapPaletteEntry(
+            label="gaia", color=BgrColorSetting(b=235, g=235, r=235), ownership=Ownership.GAIA
+        ),
+    )
+
+
+class WorldExtentSettings(BaseModel):
+    """The world rectangle the minimap covers, in engine units (D6)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    origin_x: float = 0.0
+    origin_y: float = 0.0
+    width: float = Field(default=1024.0, gt=0.0)
+    height: float = Field(default=1024.0, gt=0.0)
+    flip_y: bool = True
+
+
+class FogSettings(BaseModel):
+    """Fog-of-war cell classification knobs (D4)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rows: int = Field(default=16, gt=0)
+    cols: int = Field(default=16, gt=0)
+    unexplored_max: float = 25.0  # mean brightness below ⇒ never seen
+    visible_min: float = 140.0  # mean brightness at/above ⇒ currently visible
+
+
+class BlipSettings(BaseModel):
+    """Blip detection knobs (D2)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tolerance: float = 70.0  # nearest-palette-colour distance tolerance
+    min_area: int = Field(default=1, ge=0)
+    max_area: int = Field(default=60, ge=0)
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class TerritorySettings(BaseModel):
+    """Territory region extraction knobs (D3)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tolerance: float = 90.0
+    min_area: int = Field(default=64, ge=0)
+
+
+class ViewportSettings(BaseModel):
+    """Camera-viewport rectangle extraction knobs (D5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    white_min: int = Field(default=200, ge=0, le=255)
+    min_area: int = Field(default=64, ge=0)
+    min_side: int = Field(default=8, ge=0)
+
+
+class MinimapSettings(BaseModel):
+    """Classical minimap-reader tuning (EPIC D), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    palette: tuple[MinimapPaletteEntry, ...] = Field(default_factory=_default_minimap_palette)
+    world_extent: WorldExtentSettings = Field(default_factory=WorldExtentSettings)
+    fog: FogSettings = Field(default_factory=FogSettings)
+    blips: BlipSettings = Field(default_factory=BlipSettings)
+    territory: TerritorySettings = Field(default_factory=TerritorySettings)
+    viewport: ViewportSettings = Field(default_factory=ViewportSettings)
+    disc_shape: bool = False  # False ⇒ SQUARE active area (D1 default); True ⇒ DISC
+    region_confidence: float = Field(default=0.9, ge=0.0, le=1.0)
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -201,3 +319,4 @@ class Config(BaseModel):
     paths: Paths = Field(default_factory=Paths)
     overlay: OverlaySettings = Field(default_factory=OverlaySettings)
     perception: PerceptionSettings = Field(default_factory=PerceptionSettings)
+    minimap: MinimapSettings = Field(default_factory=MinimapSettings)
