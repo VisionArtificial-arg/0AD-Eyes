@@ -560,6 +560,23 @@ class CalibrationSettings(BaseModel):
     selfcheck_use_anchors: bool = True
 
 
+class PerfSettings(BaseModel):
+    """Performance gate targets (NF1/NF2), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    latency_target_ms: float = Field(default=66.0, gt=0.0)  # NF1 budget
+    throughput_target_fps: float = Field(default=15.0, gt=0.0)  # NF2 floor
+
+
+class PipelineSettings(BaseModel):
+    """Runtime orchestration tuning for the perception pipeline."""
+
+    model_config = ConfigDict(frozen=True)
+
+    recalibrate_interval: int = Field(default=30, ge=1)  # frames between B4 self-checks
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -583,3 +600,5 @@ class Config(BaseModel):
     tracking: TrackingSettings = Field(default_factory=TrackingSettings)
     preprocessing: PreprocessingSettings = Field(default_factory=PreprocessingSettings)
     calibration: CalibrationSettings = Field(default_factory=CalibrationSettings)
+    perf: PerfSettings = Field(default_factory=PerfSettings)
+    pipeline: PipelineSettings = Field(default_factory=PipelineSettings)

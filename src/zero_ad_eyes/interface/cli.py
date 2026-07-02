@@ -85,6 +85,7 @@ def _build_offline_pipeline(
         self_check=LayoutSelfCheck.from_settings(cfg.calibration),
         hud_reader=ClassicalHudReader.from_settings(cfg.hud),
         minimap_reader=ClassicalMinimapReader.from_settings(cfg.minimap),
+        recalibrate_interval=cfg.pipeline.recalibrate_interval,
         tracker=IouTracker.from_settings(cfg.tracking),
         enricher=ClassicalEntityEnricher.from_settings(cfg.perception),
         event_detector=ClassicalEventDetector.from_settings(cfg.tracking),
@@ -249,7 +250,13 @@ def _run_bench(
         source = _synthetic_source(frames, width, height)
         pipeline = PerceptionPipeline(source, StubPerceptionModel(), profiler=timings)  # type: ignore[arg-type]
 
-    report = benchmark(pipeline, warmup=warmup, model_available=False)
+    report = benchmark(
+        pipeline,
+        warmup=warmup,
+        model_available=False,
+        latency_target_ms=config.perf.latency_target_ms,
+        throughput_target_fps=config.perf.throughput_target_fps,
+    )
     latency = report.latency
     print(f"bench: {report.frames} frames measured (warmup {report.warmup})")
     print(
