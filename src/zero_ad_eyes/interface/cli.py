@@ -194,7 +194,14 @@ def _print_report(report: object) -> int:
     for metric in report.metrics:
         print(_format_metric(metric))
     verdict = report.passed
-    print(f"eval: {'PENDING' if verdict is None else ('PASS' if verdict else 'FAIL')}")
+    if verdict is False:
+        label = "FAIL"  # a measured metric fell short — surfaced even if mAP is pending
+    elif verdict is True:
+        label = "PASS"
+    else:  # None: every measured metric passed; only model-dependent metric(s) pend
+        pending = ", ".join(metric.name for metric in report.metrics if metric.is_pending)
+        label = f"PASS (classical); pending-model: {pending}"
+    print(f"eval: {label}")
     return 1 if verdict is False else 0
 
 

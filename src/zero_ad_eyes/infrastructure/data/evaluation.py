@@ -125,9 +125,25 @@ class EvaluationReport(BaseModel):
         return any(metric.is_pending for metric in self.metrics)
 
     @property
-    def passed(self) -> bool | None:
-        """Overall verdict, or ``None`` if any metric is still ``pending-model``."""
+    def has_measured_failure(self) -> bool:
+        """Any *computed* metric that fell short of its threshold (pending excluded)."""
 
+        return any(metric.passed is False for metric in self.metrics)
+
+    @property
+    def passed(self) -> bool | None:
+        """Overall verdict, honest about the model gap:
+
+        - ``False`` if any *measured* metric fails — surfaced even while the
+          model-dependent metric(s) are still ``pending-model``, so a real classical
+          regression never hides behind the absent detection mAP;
+        - ``None`` if every measured metric passes but some metric is pending-model
+          (the classical gate is green; the full gate can't close until MP4);
+        - ``True`` if every metric is measured and passes.
+        """
+
+        if self.has_measured_failure:
+            return False
         if self.has_pending:
             return None
         return all(metric.passed for metric in self.metrics)

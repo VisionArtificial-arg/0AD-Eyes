@@ -41,3 +41,45 @@ def test_run_over_image_folder_emits_v0_2_world_models(
     assert code == 0
     out = capsys.readouterr().out
     assert '"schema_version":"0.2.0"' in out
+
+
+# --- eval verdict rendering + exit code (classical-only gate) --------------- #
+
+
+def _scored(*, ownership_ok: bool) -> object:
+    from zero_ad_eyes.infrastructure.data import EvaluationReport, MetricResult
+
+    return EvaluationReport(
+        hud_read_error=MetricResult.computed("hud_read_error", 0.0, 0.01, False),
+        detection_map=MetricResult.pending_model("detection_map", 0.80, True),
+        ownership_accuracy=MetricResult.computed(
+            "ownership_accuracy", 0.99 if ownership_ok else 0.50, 0.98, True
+        ),
+        tracking_mota=MetricResult.computed("tracking_mota", 0.80, 0.70, True),
+    )
+
+
+def test_print_report_pending_model_is_pass_classical_exit_zero(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from zero_ad_eyes.interface.cli import _print_report
+
+    code = _print_report(_scored(ownership_ok=True))
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "PASS (classical)" in out
+    assert "pending-model: detection_map" in out
+
+
+def test_print_report_measured_failure_is_fail_exit_one(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from zero_ad_eyes.interface.cli import _print_report
+
+    # A classical regression must fail the gate even while detection mAP pends.
+    code = _print_report(_scored(ownership_ok=False))
+    out = capsys.readouterr().out
+
+    assert code == 1
+    assert "eval: FAIL" in out

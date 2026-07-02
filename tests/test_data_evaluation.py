@@ -13,6 +13,7 @@ from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership, ResourceType
 from zero_ad_eyes.domain.world_model import FrameMeta, WorldModel
 from zero_ad_eyes.infrastructure.data.evaluation import (
     EvaluationReport,
+    MetricResult,
     MetricStatus,
     evaluate,
     hud_read_error,
@@ -238,3 +239,59 @@ def test_evaluate_computes_map_only_when_model_available() -> None:
     assert math.isclose(report.detection_map.value, 1.0)
     assert report.has_pending is False
     assert report.passed is True  # all four NF3 metrics pass on this clean case
+
+
+# --- overall verdict: classical failures surface even while the model pends -- #
+
+
+def _report(
+    *,
+    hud: bool,
+    ownership: bool,
+    mota: bool,
+    map_pending: bool,
+) -> EvaluationReport:
+    """A scorecard whose measured metrics pass/fail per the flags; mAP is either
+    pending-model or a passing computed value."""
+
+    detection_map = (
+        MetricResult.pending_model("detection_map", 0.80, True)
+        if map_pending
+        else MetricResult.computed("detection_map", 0.90, 0.80, True)
+    )
+    return EvaluationReport(
+        hud_read_error=MetricResult.computed("hud_read_error", 0.0 if hud else 0.5, 0.01, False),
+        detection_map=detection_map,
+        ownership_accuracy=MetricResult.computed(
+            "ownership_accuracy", 0.99 if ownership else 0.50, 0.98, True
+        ),
+        tracking_mota=MetricResult.computed("tracking_mota", 0.80 if mota else 0.10, 0.70, True),
+    )
+
+
+def test_measured_failure_fails_verdict_even_while_model_pending() -> None:
+    # A real classical regression (ownership below target) must not hide behind
+    # the absent detection mAP: the overall verdict is FALSE, not None.
+    report = _report(hud=True, ownership=False, mota=True, map_pending=True)
+
+    assert report.detection_map.is_pending is True
+    assert report.has_pending is True
+    assert report.has_measured_failure is True
+    assert report.passed is False
+
+
+def test_all_measured_pass_but_model_pending_is_no_verdict() -> None:
+    # The classical gate is green; the full gate cannot close until MP4.
+    report = _report(hud=True, ownership=True, mota=True, map_pending=True)
+
+    assert report.has_measured_failure is False
+    assert report.has_pending is True
+    assert report.passed is None
+
+
+def test_measured_failure_fails_verdict_when_nothing_pends() -> None:
+    report = _report(hud=True, ownership=True, mota=False, map_pending=False)
+
+    assert report.has_pending is False
+    assert report.has_measured_failure is True
+    assert report.passed is False
