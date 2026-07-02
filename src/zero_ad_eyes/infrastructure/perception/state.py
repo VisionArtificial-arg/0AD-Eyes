@@ -22,6 +22,7 @@ import cv2
 import numpy as np
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import StateCueSettings
 from zero_ad_eyes.domain.geometry import ScreenBBox
 
 from .masks import connected_components
@@ -84,6 +85,8 @@ def detect_construction(
     frame: Frame,
     bbox: ScreenBBox,
     edge_density_min: float = 0.12,
+    canny_lo: float = 60.0,
+    canny_hi: float = 180.0,
 ) -> bool:
     """True if the interior is wireframe-busy — a construction scaffold cue."""
 
@@ -92,7 +95,7 @@ def detect_construction(
         return False
     interior = frame.image[y0:y1, x0:x1]
     gray = cv2.cvtColor(interior, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 60, 180)
+    edges = cv2.Canny(gray, canny_lo, canny_hi)
     density = float(np.count_nonzero(edges)) / float(edges.size)
     return density >= edge_density_min
 
@@ -125,11 +128,29 @@ def detect_garrison(
     return False
 
 
-def read_state_cues(frame: Frame, bbox: ScreenBBox) -> StateCues:
-    """Run all three best-effort cues for one entity and bundle the result."""
+def read_state_cues(
+    frame: Frame, bbox: ScreenBBox, settings: StateCueSettings | None = None
+) -> StateCues:
+    """Run all three best-effort cues for one entity and bundle the result.
 
+    Knobs come from ``settings`` (config-driven, NF7); default reproduces the former
+    hard-coded thresholds.
+    """
+
+    cfg = settings or StateCueSettings()
+    sel, con, gar = cfg.selection, cfg.construction, cfg.garrison
     return StateCues(
-        selected=detect_selection(frame, bbox),
-        under_construction=detect_construction(frame, bbox),
-        garrisoned=detect_garrison(frame, bbox),
+        selected=detect_selection(frame, bbox, sel.thickness, sel.brightness, sel.min_fraction),
+        under_construction=detect_construction(
+            frame, bbox, con.edge_density_min, con.canny_lo, con.canny_hi
+        ),
+        garrisoned=detect_garrison(
+            frame,
+            bbox,
+            gar.top_fraction,
+            gar.brightness,
+            gar.max_saturation,
+            gar.min_badge_area,
+            gar.max_badge_width_fraction,
+        ),
     )

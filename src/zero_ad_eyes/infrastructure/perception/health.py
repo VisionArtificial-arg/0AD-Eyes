@@ -113,6 +113,7 @@ def read_health(
     max_offset: int = 20,
     s_min: int = 60,
     v_min: int = 60,
+    min_run: float = 0.15,
 ) -> float | None:
     """Locate the health bar above ``entity_bbox`` and return its fill fraction.
 
@@ -120,7 +121,9 @@ def read_health(
     that reads 0.0.
     """
 
-    bar = locate_health_bar(frame, entity_bbox, max_offset=max_offset, s_min=s_min, v_min=v_min)
+    bar = locate_health_bar(
+        frame, entity_bbox, max_offset=max_offset, s_min=s_min, v_min=v_min, min_run=min_run
+    )
     if bar is None:
         return None
     return measure_fill(frame, bar, s_min=s_min, v_min=v_min)

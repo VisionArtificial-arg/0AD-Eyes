@@ -22,7 +22,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from zero_ad_eyes.application.frames import Frame
-from zero_ad_eyes.application.settings import PerceptionSettings
+from zero_ad_eyes.application.settings import (
+    HealthReadSettings,
+    PerceptionSettings,
+    StateCueSettings,
+)
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.taxonomy import Ownership
 
@@ -40,9 +44,13 @@ class ClassicalEntityEnricher:
         *,
         ownership_palette: PlayerPalette | None = None,
         ownership_min_fraction: float = 0.02,
+        health: HealthReadSettings | None = None,
+        state: StateCueSettings | None = None,
     ) -> None:
         self._ownership_palette = ownership_palette or DEFAULT_PALETTE
         self._ownership_min_fraction = ownership_min_fraction
+        self._health = health or HealthReadSettings()
+        self._state = state or StateCueSettings()
 
     @classmethod
     def from_settings(cls, settings: PerceptionSettings) -> ClassicalEntityEnricher:
@@ -51,6 +59,8 @@ class ClassicalEntityEnricher:
         return cls(
             ownership_palette=PlayerPalette.from_settings(settings.ownership_palette),
             ownership_min_fraction=settings.ownership_min_fraction,
+            health=settings.health,
+            state=settings.state,
         )
 
     def enrich(self, entities: Sequence[Entity], frame: Frame) -> tuple[Entity, ...]:
@@ -71,11 +81,18 @@ class ClassicalEntityEnricher:
                 update["ownership"] = owner
 
         if entity.health is None:
-            health = read_health(frame, bbox)
+            health = read_health(
+                frame,
+                bbox,
+                max_offset=self._health.max_offset,
+                s_min=self._health.s_min,
+                v_min=self._health.v_min,
+                min_run=self._health.min_run,
+            )
             if health is not None:
                 update["health"] = health
 
-        if not entity.selected and read_state_cues(frame, bbox).selected:
+        if not entity.selected and read_state_cues(frame, bbox, self._state).selected:
             update["selected"] = True
 
         return entity.model_copy(update=update) if update else entity

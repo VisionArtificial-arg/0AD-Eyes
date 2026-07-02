@@ -229,8 +229,61 @@ def _default_resource_cues() -> tuple[ResourceCueSetting, ...]:
     )
 
 
+class HealthReadSettings(BaseModel):
+    """Health-bar reading knobs (E4)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    max_offset: int = Field(default=20, ge=0)  # search band height above the entity
+    s_min: int = Field(default=60, ge=0, le=255)  # HSV saturation floor
+    v_min: int = Field(default=60, ge=0, le=255)  # HSV value floor
+    min_run: float = Field(default=0.15, ge=0.0, le=1.0)  # min bright-run width fraction
+
+
+class SelectionCueSettings(BaseModel):
+    """Selection-ring cue knobs (E5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    thickness: int = Field(default=3, ge=1)
+    brightness: int = Field(default=200, ge=0, le=255)
+    min_fraction: float = Field(default=0.4, ge=0.0, le=1.0)
+
+
+class ConstructionCueSettings(BaseModel):
+    """Construction-scaffold cue knobs (E5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    edge_density_min: float = Field(default=0.12, ge=0.0, le=1.0)
+    canny_lo: float = 60.0
+    canny_hi: float = 180.0
+
+
+class GarrisonCueSettings(BaseModel):
+    """Garrison-badge cue knobs (E5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    top_fraction: float = Field(default=0.35, ge=0.0, le=1.0)
+    brightness: int = Field(default=200, ge=0, le=255)
+    max_saturation: int = Field(default=70, ge=0, le=255)
+    min_badge_area: int = Field(default=6, ge=0)
+    max_badge_width_fraction: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class StateCueSettings(BaseModel):
+    """The three best-effort entity-state cues (E5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    selection: SelectionCueSettings = Field(default_factory=SelectionCueSettings)
+    construction: ConstructionCueSettings = Field(default_factory=ConstructionCueSettings)
+    garrison: GarrisonCueSettings = Field(default_factory=GarrisonCueSettings)
+
+
 class PerceptionSettings(BaseModel):
-    """Classical perception tuning (E3 ownership, E6a resources), config-driven (NF7)."""
+    """Classical perception tuning (E3/E4/E5 + E6a resources), config-driven (NF7)."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -238,6 +291,8 @@ class PerceptionSettings(BaseModel):
     ownership_min_fraction: float = Field(default=0.02, ge=0.0, le=1.0)
     detect_resources: bool = True
     resource_cues: tuple[ResourceCueSetting, ...] = Field(default_factory=_default_resource_cues)
+    health: HealthReadSettings = Field(default_factory=HealthReadSettings)
+    state: StateCueSettings = Field(default_factory=StateCueSettings)
 
 
 # --------------------------------------------------------------------------- #
