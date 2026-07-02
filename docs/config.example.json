@@ -463,7 +463,12 @@
     "live_monitor": 1,
     "live_fps": 30.0,
     "record_fourcc": "FFV1",
-    "record_container": ".mkv"
+    "record_container": ".mkv",
+    "capture_backend": "mss",
+    "wayland_capture_command": [
+      "grim",
+      "-"
+    ]
   },
   "geometry": {
     "camera_error_tolerance": 1.0,

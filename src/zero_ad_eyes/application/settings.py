@@ -19,6 +19,7 @@ RGB triples; the overlay converts them to OpenCV's BGR order at draw time.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -475,6 +476,10 @@ class AcquisitionSettings(BaseModel):
     live_fps: float = Field(gt=0.0)  # live-capture target pacing
     record_fourcc: str = Field(min_length=1)  # cv2 FOURCC for --record (e.g. "FFV1" lossless)
     record_container: str = Field(min_length=1)  # recording file suffix (e.g. ".mkv")
+    capture_backend: Literal["mss", "wayland"]  # X11/mss, or a Wayland screenshot CLI
+    # command that writes one encoded image to stdout, used when capture_backend="wayland"
+    # (e.g. grim on wlroots/Hyprland: ("grim", "-")); ignored under the mss backend.
+    wayland_capture_command: tuple[str, ...] = Field(min_length=1)
 
 
 class GeometrySettings(BaseModel):

@@ -15,7 +15,7 @@ from .backpressure import BoundedFrameBuffer, ThreadedFrameSource
 from .offline import ImageFolderSource, RecordedVideoSource, VideoFileSource
 from .recorder import FrameRecorder
 from .recording import FrameStamp, RecordingManifest
-from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource
+from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource, WaylandGrabber
 from .timing import FramePacer, Tick
 from .video_recorder import VideoFrameRecorder, VideoSink, VideoSinkFactory
 
@@ -49,4 +49,5 @@ __all__ = [
     "VideoFrameRecorder",
     "VideoSink",
     "VideoSinkFactory",
+    "WaylandGrabber",
 ]

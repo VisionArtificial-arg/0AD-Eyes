@@ -283,6 +283,8 @@ def default_config() -> Config:
             live_fps=30.0,
             record_fourcc="FFV1",  # lossless: --record footage feeds #2 real-frame metrics
             record_container=".mkv",  # FFV1's native container; readable by VideoFileSource
+            capture_backend="mss",  # X11 default; set "wayland" on Wayland sessions
+            wayland_capture_command=("grim", "-"),  # wlroots/Hyprland; overridable per machine
         ),
         geometry=GeometrySettings(
             camera_error_tolerance=1.0,

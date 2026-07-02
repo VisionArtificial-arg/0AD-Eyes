@@ -10,7 +10,7 @@ never needs a display; the default ``MssGrabber`` is the only place that touches
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -72,6 +72,51 @@ class MssGrabber:
             self._sct = None
 
 
+CommandRunner = Callable[[Sequence[str]], bytes]
+
+
+class WaylandGrabber:
+    """``Grabber`` for Wayland sessions, via a screenshot CLI that writes one encoded
+    image to stdout (e.g. ``grim -`` on wlroots/Hyprland).
+
+    X11 ``GetImage`` (what ``mss`` uses) is blocked under Wayland/XWayland, so live
+    capture there goes through the compositor's own screenshot tool over the Wayland
+    protocol. The command is config-driven (``acquisition.wayland_capture_command``) so
+    it adapts per compositor; the process runner is injected so the decode/crop path is
+    unit-testable without spawning anything or needing a display.
+    """
+
+    def __init__(
+        self,
+        command: Sequence[str],
+        region: CaptureRegion | None = None,
+        *,
+        runner: CommandRunner | None = None,
+    ) -> None:
+        if not command:
+            raise ValueError("wayland capture command must not be empty")
+        self._command = tuple(command)
+        self._region = region
+        self._runner = runner if runner is not None else self._default_runner
+
+    def grab(self) -> RawImage:
+        encoded = self._runner(self._command)
+        image = cv2.imdecode(np.frombuffer(encoded, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            raise OSError(f"cannot decode image from capture command {self._command!r}")
+        if self._region is not None:
+            r = self._region
+            image = image[r.top : r.top + r.height, r.left : r.left + r.width]
+        return image
+
+    @staticmethod
+    def _default_runner(command: Sequence[str]) -> bytes:
+        import subprocess
+
+        result = subprocess.run(tuple(command), capture_output=True, check=True)
+        return result.stdout
+
+
 def _to_bgr(raw: RawImage) -> RawImage:
     """Normalise a raw grab to 3-channel BGR (``mss`` yields BGRA)."""
 
@@ -114,9 +159,14 @@ class ScreenCaptureSource:
 
         The tuning values (which monitor, target FPS) come from config; ``region`` and
         the run-control / test seams (``grabber``, ``max_frames``) are supplied by the
-        composition root, since they are not tuning defaults.
+        composition root, since they are not tuning defaults. The grabber is chosen by
+        ``capture_backend``: the default ``mss`` (X11) is built lazily in ``__init__``;
+        ``wayland`` builds a :class:`WaylandGrabber` from ``wayland_capture_command``.
+        An explicitly injected ``grabber`` overrides the backend selection (tests).
         """
 
+        if grabber is None and settings.capture_backend == "wayland":
+            grabber = WaylandGrabber(settings.wayland_capture_command, region)
         return cls(
             monitor=settings.live_monitor,
             target_fps=settings.live_fps,

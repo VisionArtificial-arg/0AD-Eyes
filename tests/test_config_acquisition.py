@@ -17,6 +17,8 @@ def test_defaults_match_historical() -> None:
     assert a.image_extensions == (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
     assert (a.live_monitor, a.live_fps) == (1, 30.0)
     assert (a.record_fourcc, a.record_container) == ("FFV1", ".mkv")
+    assert a.capture_backend == "mss"
+    assert a.wayland_capture_command == ("grim", "-")
 
 
 def test_config_file_threads_offline_fps(tmp_path: Path) -> None:
