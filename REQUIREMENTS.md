@@ -7,6 +7,53 @@
 
 ---
 
+## 0. Implementation Status (updated 2026-07-01)
+
+Snapshot of what is built. Checkboxes below are kept in sync with this table.
+
+- **Output contract: `SCHEMA_VERSION` = `0.2.0`.** The world model carries entities,
+  HUD (incl. **selection**), minimap (incl. **fog grid** + **territory**), per-entity
+  **motion**, and an **events** list; `Frame` carries a **crop_offset**. All v0.2
+  fields are populated **end-to-end** by the classical pipeline (empty/`None` only
+  when honestly unobservable — never fabricated).
+- **`just validate` is green:** 397 passed, 1 skipped (the skip is live screen
+  capture — the X server in the build sandbox rejects `GetImage`; the code exists,
+  the environment can't exercise it). `check` (ruff + mypy) and `test` are clean;
+  `eval` runs the real ML8 harness and reports the 🔌 metric as `pending-model`.
+
+| Area | State |
+|------|-------|
+| A Acquisition · P Preprocessing · B Calibration · C HUD · D Minimap | **Done** |
+| E main-viewport **classical** (E3/E4/E5/E6a/E7/E10/E11) | **Done** |
+| E main-viewport **learned** (E1/E2/E6b/E8/E9) | **🔌 blocked on model team (MP4)** |
+| F Geometry · G Tracking/Fusion/Motion/Events/Spatial · H Contract | **Done** |
+| Model seam MP1–MP3, MP5 (port + stub + parity) | **Done**; **MP4** 🔌 |
+| Data ML1/ML2/ML3/ML8 | **Done**; ML4/ML5/ML6 🔌 (model team); ML7 blocked on MP4 |
+| Tooling X1–X8 (overlay, replay CLI, config, uv+just, docs, CI, lock) | **Done** |
+| Tests T1–T3, T5 | **Done**; **T4** live-smoke (needs a real display) and **T6** perf/NF1–NF2 benchmarks **open** |
+
+**Integration decisions taken (2026-07-01), now implemented:**
+- `EntityEnricher` **port** + classical adapter: a post-tracking stage folds
+  ownership/health/selection onto tracked entities, *fill-if-absent* (never clobbers
+  a confident learned value).
+- `EventSource` **port** + `ClassicalEventDetector`: frame-over-frame transitions →
+  `world_model.events`.
+- **Fusion single-home (G5):** `resolve_conflict` owns entity fusion and delegates
+  the two-estimate spatial blend to F3 `reconcile`; inverse-variance is the documented
+  eventual target.
+- **Onion fix:** config value-object *types* live in `application.settings`; the
+  JSON/env loader stays in `infrastructure.config` (no interface→infra sideways dep).
+- **CLI:** `zero-ad-eyes run --recording PATH` drives the full classical chain
+  (`--detector classical` opts into the E6a baseline; the model seam stays stubbed).
+- **Gate/DX:** `just eval` runs the real harness; git hooks (`pre-commit=check`,
+  `pre-push=validate`) + `just setup`.
+
+**Reached:** M0–M2, **M3-scaffold**, M4, M5, and the non-🔌 parts of M6. **DoD-A**
+(this team's scope, stub proving the seam) is met except T4/T6. **DoD-B** remains
+open on the model artifact (MP4) and the NF1/NF3 gates it unblocks.
+
+---
+
 ## 1. Purpose & Scope
 
 ### 1.1 Mission
@@ -119,6 +166,9 @@ Per detected entity:
 
 ### 4.7 Contract engineering `[M]`
 - Versioned schema (semver) with a serialization format (e.g. JSON/protobuf).
+  **Implemented — `SCHEMA_VERSION = 0.2.0`** (v0.2 added the fog grid, territory,
+  selection, per-entity motion, events, and `Frame.crop_offset`; new fields default
+  empty/`None`, so 0.1 consumers stay compatible).
 - Backward-compatibility policy; every field carries confidence + provenance.
 - **Transport-agnostic (OQ-3 deferred):** the schema is designed independently of
   the delivery mechanism; the concrete IPC (in-process / socket / shared memory) is
@@ -136,104 +186,104 @@ Actionable checklist. IDs are stable references for planning/commits.
 > 🔌 is buildable now** and is exactly the "plug-and-play" scope this layer targets.
 
 ### EPIC A — Frame Acquisition `[M]`
-- [ ] **A1** Live screen/window capture at a target FPS (region = game window).
-- [ ] **A2** Offline reader: video files and image-sequence folders behave
+- [x] **A1** Live screen/window capture at a target FPS (region = game window).
+- [x] **A2** Offline reader: video files and image-sequence folders behave
       identically to live (same downstream interface).
-- [ ] **A3** Unified `FrameSource` abstraction so live/offline are interchangeable.
-- [ ] **A4** Timestamping, frame-drop detection, backpressure handling.
-- [ ] **A5** Recording/dump mode: persist captured frames for dataset building.
+- [x] **A3** Unified `FrameSource` abstraction so live/offline are interchangeable.
+- [x] **A4** Timestamping, frame-drop detection, backpressure handling.
+- [x] **A5** Recording/dump mode: persist captured frames for dataset building.
 
 ### EPIC P — Preprocessing `[M]`
 Shared frame-conditioning stage between acquisition and all perception. Every
 perception epic consumes the preprocessed frame, not the raw capture.
-- [ ] **P1** Preprocessing pipeline scaffold (composable, per-consumer variants).
-- [ ] **P2** Color-space transforms (RGB↔HSV/Lab) to make UI, player colors, and
+- [x] **P1** Preprocessing pipeline scaffold (composable, per-consumer variants).
+- [x] **P2** Color-space transforms (RGB↔HSV/Lab) to make UI, player colors, and
       resource nodes separable (CV-03).
-- [ ] **P3** Normalization: reduce brightness/contrast/render variation (CV-04).
-- [ ] **P4** Noise filtering: remove compression/render artifacts (CV-05).
-- [ ] **P5** Contrast enhancement (e.g. CLAHE) for small/low-contrast objects (CV-06).
-- [ ] **P6** Edge detection (Canny/Sobel) feeding classical detection & contours (CV-07).
-- [ ] **P7** Region-of-Interest (ROI) gating: restrict heavy processing to relevant
+- [x] **P3** Normalization: reduce brightness/contrast/render variation (CV-04).
+- [x] **P4** Noise filtering: remove compression/render artifacts (CV-05).
+- [x] **P5** Contrast enhancement (e.g. CLAHE) for small/low-contrast objects (CV-06).
+- [x] **P6** Edge detection (Canny/Sobel) feeding classical detection & contours (CV-07).
+- [x] **P7** Region-of-Interest (ROI) gating: restrict heavy processing to relevant
       areas (HUD boxes, viewport, motion regions) for latency (CV-28).
 
 ### EPIC B — Calibration & UI Layout `[M]`
-- [ ] **B1** Detect resolution and UI scale per session.
-- [ ] **B2** Locate HUD regions (top bar, minimap, selection panel) robustly to
+- [x] **B1** Detect resolution and UI scale per session.
+- [x] **B2** Locate HUD regions (top bar, minimap, selection panel) robustly to
       resolution/theme — anchor detection, not hard-coded pixels (per A4).
-- [ ] **B3** Persist/reuse calibration profiles keyed by resolution+theme.
-- [ ] **B4** Self-check: flag when the live layout no longer matches calibration.
+- [x] **B3** Persist/reuse calibration profiles keyed by resolution+theme.
+- [x] **B4** Self-check: flag when the live layout no longer matches calibration.
 
 ### EPIC C — HUD Parsing `[M]`
-- [ ] **C1** OCR/number-reading of the four resource counters (§4.2).
-- [ ] **C2** Population current/cap parsing.
-- [ ] **C3** Phase detection (icon/text classification).
-- [ ] **C4** Self-identification: own player color + civ.
-- [ ] **C5** Selection panel reader: selected entity type, health, queues `[S]`.
-- [ ] **C6** Robustness to number formatting, transient tooltips, notifications.
+- [x] **C1** OCR/number-reading of the four resource counters (§4.2).
+- [x] **C2** Population current/cap parsing.
+- [x] **C3** Phase detection (icon/text classification).
+- [x] **C4** Self-identification: own player color + civ.
+- [x] **C5** Selection panel reader: selected entity type, health, queues `[S]`.
+- [x] **C6** Robustness to number formatting, transient tooltips, notifications.
 
 ### EPIC D — Minimap Interpretation `[M]`
-- [ ] **D1** Segment the minimap disc/region from calibration.
-- [ ] **D2** Blip detection + owner-color classification.
-- [ ] **D3** Territory/border region extraction.
-- [ ] **D4** Fog-of-war cell classification on the minimap.
-- [ ] **D5** Camera-viewport rectangle extraction.
-- [ ] **D6** Minimap-pixel → world-coordinate calibration.
+- [x] **D1** Segment the minimap disc/region from calibration.
+- [x] **D2** Blip detection + owner-color classification.
+- [x] **D3** Territory/border region extraction.
+- [x] **D4** Fog-of-war cell classification on the minimap.
+- [x] **D5** Camera-viewport rectangle extraction.
+- [x] **D6** Minimap-pixel → world-coordinate calibration.
 
 ### EPIC E — Main-Viewport Perception `[M]`
 Primary strategy is **learned segmentation/detection**; classical methods
 (template matching, contours) are baselines and fallbacks for fixed/known art.
 - [ ] 🔌 **E1** Entity **detection** + **localization** in the 3D scene (CV-10/CV-11).
 - [ ] 🔌 **E2** Entity **classification** into the taxonomy (§4.3), extensible (CV-14).
-- [ ] **E3** **Ownership** assignment via player-color segmentation, robust to
+- [x] **E3** **Ownership** assignment via player-color segmentation, robust to
       lighting/terrain/shadow and to color-blind palettes. *(classical — not model-dep)*
-- [ ] **E4** Health-bar reading → health fraction. *(classical — not model-dep)*
-- [ ] **E5** State cues: selection ring, construction scaffold, garrison, rank `[S]`.
-- [ ] **E6a** On-map resource-node detection — **classical baseline** (template
+- [x] **E4** Health-bar reading → health fraction. *(classical — not model-dep)*
+- [x] **E5** State cues: selection ring, construction scaffold, garrison, rank `[S]`.
+- [x] **E6a** On-map resource-node detection — **classical baseline** (template
       match on fixed resource art + color/contour cues for trees/mines/bushes/fauna).
       Coarse recall, works **without the model**. *(not model-dep)*
 - [ ] 🔌 **E6b** Resource-node detection — **learned refinement** via the model
       (better recall/precision in cluttered 3D scenes, exact sub-type). Supersedes
       E6a where confident; falls back to E6a otherwise.
-- [ ] **E7** Occlusion / partial-visibility handling (CV-27). *(logic buildable on
+- [x] **E7** Occlusion / partial-visibility handling (CV-27). *(logic buildable on
       stub; validated only against real E1/E8 output)*
 - [ ] 🔌 **E8** **Semantic segmentation** (U-Net or equivalent): per-pixel class map of
       the scene (CV-12; pixel-wise classification CV-29). Feeds E1/E2 + scene understanding.
 - [ ] 🔌 **E9** **Instance segmentation**: separate individual entities of the same
       class (CV-13).
-- [ ] **E10** Mask post-processing: connected-component analysis, contour
+- [x] **E10** Mask post-processing: connected-component analysis, contour
       detection, morphological open/close to clean masks (CV-30/CV-31/CV-32).
-- [ ] **E11** **Template matching** + feature descriptors for fixed UI icons and
+- [x] **E11** **Template matching** + feature descriptors for fixed UI icons and
       known static art (CV-08/CV-09), as a deterministic complement to E1/E2.
 
 ### EPIC F — Camera & Coordinate Geometry `[M]`
-- [ ] **F1** Recover camera pose / ground-plane homography from visual cues so
+- [x] **F1** Recover camera pose / ground-plane homography from visual cues so
       screen detections project to world coordinates.
-- [ ] **F2** Handle camera pan/zoom/rotation across frames.
-- [ ] **F3** Reconcile main-view world positions with minimap world positions.
-- [ ] **F4** Quantify projection error; expose it as confidence.
+- [x] **F2** Handle camera pan/zoom/rotation across frames.
+- [x] **F3** Reconcile main-view world positions with minimap world positions.
+- [x] **F4** Quantify projection error; expose it as confidence.
 
 ### EPIC G — Temporal Tracking & World Model `[M]`
-- [ ] **G1** Single- and **multi-object tracking**: assign stable ids across
+- [x] **G1** Single- and **multi-object tracking**: assign stable ids across
       frames and maintain trajectories (CV-15/CV-16).
-- [ ] **G2** Track lifecycle: birth, death, enter/leave fog, enter/leave viewport.
-- [ ] **G3** **Memory** of entities currently off-screen or in explored-but-not-
+- [x] **G2** Track lifecycle: birth, death, enter/leave fog, enter/leave viewport.
+- [x] **G3** **Memory** of entities currently off-screen or in explored-but-not-
       -visible fog, with staleness decay (per §4.1).
-- [ ] **G4** Fuse main-view + minimap + HUD into one coherent world model
+- [x] **G4** Fuse main-view + minimap + HUD into one coherent world model
       (scene understanding + world-state reconstruction, CV-20/CV-21).
-- [ ] **G5** Conflict resolution when sources disagree (confidence-weighted).
-- [ ] **G6** **Optical flow** + **motion estimation**: pixel motion → entity
+- [x] **G5** Conflict resolution when sources disagree (confidence-weighted).
+- [x] **G6** **Optical flow** + **motion estimation**: pixel motion → entity
       direction/speed; also drives ROI gating (CV-17/CV-18).
-- [ ] **G7** **Temporal analysis** across frames to stabilize perception (CV-19).
-- [ ] **G8** **Event detection**: combat, resource depletion, building completion,
+- [x] **G7** **Temporal analysis** across frames to stabilize perception (CV-19).
+- [x] **G8** **Event detection**: combat, resource depletion, building completion,
       unit produced/lost (CV-34), derived from temporal state changes.
-- [ ] **G9** **Spatial reasoning**: proximity, visibility, occupancy relations
+- [x] **G9** **Spatial reasoning**: proximity, visibility, occupancy relations
       between entities (CV-33).
 
 ### EPIC H — Output Contract & Integration `[M]`
-- [ ] **H1** Define and version the world-model schema (§4).
-- [ ] **H2** Serialization + in-process API for the decision layer.
-- [ ] **H3** Publish cadence (per-frame vs on-change) and latency budget.
-- [ ] **H4** Consumer-facing docs + example client stub.
+- [x] **H1** Define and version the world-model schema (§4).
+- [x] **H2** Serialization + in-process API for the decision layer.
+- [x] **H3** Publish cadence (per-frame vs on-change) and latency budget.
+- [x] **H4** Consumer-facing docs + example client stub.
 
 ### 5.9 CV Technique Catalog (method → epic → milestone)
 
@@ -320,11 +370,11 @@ A single interface (onion: a **port**; the model is an infrastructure **adapter*
 is the only thing the rest of the pipeline knows about. Nothing downstream imports
 a model, a framework, or weights.
 
-- [ ] **MP1** Define `PerceptionModel` port: `infer(preprocessed_frame, roi?) ->
+- [x] **MP1** Define `PerceptionModel` port: `infer(preprocessed_frame, roi?) ->
       Detections`, where `Detections` is a stable value object
       (per item: mask/bbox in a documented coordinate convention, class label from
       the §4.3 taxonomy, score/confidence; plus optional dense segmentation map).
-- [ ] **MP2** Freeze the **I/O contract**: input tensor spec (size, channel order,
+- [x] **MP2** Freeze the **I/O contract**: input tensor spec (size, channel order,
       normalization from EPIC P), output schema, class-id↔taxonomy mapping,
       coordinate + scale convention. Versioned; the model team builds to this.
       - Each detection carries a **first-class confidence** *and* a **provenance
@@ -332,13 +382,13 @@ a model, a framework, or weights.
         downstream (G/H) weights coarse-vs-refined signals identically whether they
         came from the stub or the real adapter. Resource-node items are the driving
         case; the field is generic, not resource-specific.
-- [ ] **MP3** Ship a **stub adapter** implementing the port without a real model:
+- [x] **MP3** Ship a **stub adapter** implementing the port without a real model:
       (a) *fixture mode* — replays hand-labeled/engine-ground-truth (D6) detections
       for recorded frames; (b) *classical mode* — the E11 template/contour path for
       the subset it can cover. Lets G/H/X run end-to-end today.
 - [ ] **MP4** Ship the **real adapter** (loads the delivered artifact, e.g. ONNX
       via onnxruntime) — the *only* new code needed at plug-in time.
-- [ ] **MP5** Adapter-parity tests: same port contract satisfied by stub and real
+- [x] **MP5** Adapter-parity tests: same port contract satisfied by stub and real
       adapter (T2 golden fixtures run against both).
 
 #### 5.10.3 What the model team must deliver (the plug)
@@ -386,12 +436,12 @@ Acceptance checklist for the artifact hand-off — until met, MP4 stays open:
 > data capture, ground-truth export, the integration seam, and the eval harness.
 > Marked **[model team]** vs **[this team]** below.
 
-- [ ] **ML1** Dataset collection pipeline (uses EPIC A recording mode). **[this team]**
-- [ ] **ML2** Ground-truth pipeline (per **D6**): extract authoritative state from
+- [x] **ML1** Dataset collection pipeline (uses EPIC A recording mode). **[this team]**
+- [x] **ML2** Ground-truth pipeline (per **D6**): extract authoritative state from
       the open-source engine (replays / debug build / AI-interface JSON) and align
       it to captured frames as labels. Offline-only; never linked into inference.
       **[this team]** (deliverable *to* the model team).
-- [ ] **ML3** Annotation tooling/format for detection, classification, ownership,
+- [x] **ML3** Annotation tooling/format for detection, classification, ownership,
       health, fog states, minimap blips. **[shared]**
 - [ ] 🔌 **ML4** Dataset coverage matrix: civilizations, biomes/maps, day/night,
       resolutions, zoom levels, crowded vs sparse scenes. **[model team]**
@@ -401,32 +451,32 @@ Acceptance checklist for the artifact hand-off — until met, MP4 stays open:
 - [ ] **ML7** Model versioning + export consumed via the **real adapter (MP4)**;
       this team owns the inference integration behind the port, not the training.
       **[this team]** — blocked on the MP2 I/O contract, not on the weights.
-- [ ] **ML8** Continuous evaluation harness with the NF3 metrics; reports
+- [x] **ML8** Continuous evaluation harness with the NF3 metrics; reports
       `pending-model` for 🔌 metrics until MP4. **[this team]**
 
 ---
 
 ## 8. Testing & Validation
 
-- [ ] **T1** Unit tests for deterministic CV stages (calibration, segmentation).
-- [ ] **T2** Golden-frame regression tests (frozen inputs → expected outputs).
-- [ ] **T3** Integration test: recording → full world model, scored vs ground truth.
+- [x] **T1** Unit tests for deterministic CV stages (calibration, segmentation).
+- [x] **T2** Golden-frame regression tests (frozen inputs → expected outputs).
+- [x] **T3** Integration test: recording → full world model, scored vs ground truth.
 - [ ] **T4** Live smoke test on a real match with the debug overlay.
-- [ ] **T5** Adversarial/edge scenes: heavy fog, mass battles, rare units, mods off.
+- [x] **T5** Adversarial/edge scenes: heavy fog, mass battles, rare units, mods off.
 - [ ] **T6** Performance benchmarks enforcing NF1/NF2 in CI.
 
 ---
 
 ## 9. Tooling & Developer Experience
 
-- [ ] **X1** Debug **overlay**: render the world model back onto the frame
+- [x] **X1** Debug **overlay**: render the world model back onto the frame
       (boxes, ids, owner colors, health, fog) — primary sanity tool.
-- [ ] **X2** Recording/replay CLI for offline runs.
-- [ ] **X3** Config system + calibration-profile store.
-- [ ] **X4** Repo scaffolding managed by **uv** (env + locked deps via
+- [x] **X2** Recording/replay CLI for offline runs.
+- [x] **X3** Config system + calibration-profile store.
+- [x] **X4** Repo scaffolding managed by **uv** (env + locked deps via
       `pyproject.toml` / `uv.lock`) and **just** as the task runner (§9.1);
       package layout, CI, linting, formatting (8-space indentation per convention).
-- [ ] **X5** README + architecture doc (onion boundaries: acquisition → perception
+- [x] **X5** README + architecture doc (onion boundaries: acquisition → perception
       → tracking → world model → contract).
 
 ### 9.1 `just` command surface (required)
@@ -437,19 +487,29 @@ always the locked one.
 
 | Recipe | Purpose | Roughly wraps |
 |--------|---------|---------------|
-| `just check` | Static gates: lint, format-check, type-check. Fast, no game needed. | `ruff check` / `ruff format --check` / type checker |
-| `just test` | Automated tests: T1–T3, T5–T6 (deterministic + integration + benchmarks). | `pytest` (with markers for slow/perf) |
-| `just validate` | **The full CI action** = `check` + `test` + accuracy-eval harness (ML8/NF3) on the held-out set. Green ⇒ CI green. | composition of the above |
-| `just run` | Launch the live perception layer against the running game (EPIC A live source + X1 overlay). | `uv run 0ad-eyes …` |
+| `just check` | Static gates: lint, format-check, type-check. Fast, no game needed. | `ruff check` / `ruff format --check` / `mypy` |
+| `just test` | Automated tests: T1–T3, T5 (deterministic + integration). | `pytest` |
+| `just eval` | ML8 accuracy harness; 🔌 metrics report `pending-model`, else score a `--dataset`. | `uv run zero-ad-eyes eval` |
+| `just validate` | **The full CI action** = `check` + `test` + `eval`. Green ⇒ CI green. | composition of the above |
+| `just run` | Run the pipeline; `--recording PATH` drives the real classical chain (X1 overlay / live source once a display is available). | `uv run zero-ad-eyes run …` |
+| `just fmt` / `just setup` | Auto-format + apply safe fixes / activate committed git hooks + `uv sync`. | `ruff` / `git config core.hooksPath` |
 
-- [ ] **X6** Author the `justfile` with at least `check`, `test`, `validate`, `run`.
-- [ ] **X7** Wire CI to invoke **`just validate`** and nothing else (parity with local).
-- [ ] **X8** `uv`-managed, reproducible env; committed `uv.lock`; documented Python
+> **Git hooks (committed):** `pre-commit` runs `just check`, `pre-push` runs
+> `just validate`; enable with `just setup`. **NF1/NF2 perf benchmarks (T6) are not
+> yet wired into `just test`.**
+
+- [x] **X6** Author the `justfile` with at least `check`, `test`, `validate`, `run`.
+- [x] **X7** Wire CI to invoke **`just validate`** and nothing else (parity with local).
+- [x] **X8** `uv`-managed, reproducible env; committed `uv.lock`; documented Python
       version pin.
 
 ---
 
 ## 10. Suggested Milestones (build order, not commitments)
+
+> **Status (§0):** M0–M2, **M3-scaffold**, M4, M5 reached; M6 non-🔌 parts done.
+> Only **M3-live** (real detection/segmentation via MP4) is outstanding, plus the
+> NF1/NF2 perf gate.
 
 1. **M0 Skeleton:** repo, `FrameSource` (live+offline), preprocessing scaffold,
    debug overlay, empty schema (EPIC A + P1).
@@ -476,6 +536,10 @@ always the locked one.
 > = everything except the 🔌 tasks, with the stub adapter proving the port. **DoD-B
 > (full)** = the below, reached once the real adapter (MP4) lands. The list below is
 > DoD-B; strike the 🔌-gated lines to read DoD-A.
+>
+> **Status:** DoD-A met **except two lines** — T4 live-smoke (needs a real display)
+> and the NF1/NF2 perf benchmark (T6). Everything else below is satisfied on the
+> stub/classical path.
 
 - All **[M]** epics implemented and passing T1–T4 (🔌-gated items on the stub for DoD-A).
 - **`just validate` is green** (check + test + accuracy eval) in CI (X7).
