@@ -9,6 +9,45 @@ The authoritative schema is the Pydantic model in
 (`EngineStateExport` / `EngineFrameState` / `EngineEntityState`). If this document
 and that module ever disagree, **the module wins** — regenerate this doc.
 
+## Purpose & label strategy (decided 2026-07-02)
+
+The exporter is **dual-purpose**: it provides ground truth to *score* perception, and
+— the larger prize — it **auto-labels a train/test/validate dataset** from engine data
++ captures, avoiding manual annotation. The label form and where it is computed follow
+from that; the JSON schema below carries the per-frame simulation state regardless.
+
+**Who computes each entity's on-screen region?**
+
+- **Engine-side (preferred).** 0 A.D. emits the label directly — pixel-perfect, and it
+  already has the renderer. The **preferred form is instance segmentation via an
+  entity-ID / picking render pass** (dump the per-pixel entity-id buffer alongside the
+  frame): masks are a strict superset of boxes (a box derives from a mask trivially),
+  give exact silhouettes, and let the renderer handle occlusion + fog *for free*,
+  auto-aligned to the RGB. Use engine-side for **both** training and scoring when
+  available — it strictly dominates.
+- **Harness-side (fallback only).** If the engine cannot emit labels cheaply, it emits
+  a per-frame **camera pose** (view-projection matrix + viewport) + entity world
+  positions/extents, and this repo projects them (reusing the F1 `ViewportCameraProjector`
+  camera model). Trivial exporter, but approximate boxes and we must filter
+  occlusion/fog ourselves — acceptable for bulk *training* labels, NOT tight enough for
+  *validation*.
+
+> **OPEN — verify first (first exporter task):** does 0 A.D. expose an entity-ID /
+> picking render pass dumpable per frame? Very likely (it underpins mouse-selection),
+> but unverified. **Yes →** build the segmentation export, drop the harness-side path.
+> **No →** fall back to camera-pose + harness-side projection. This one fact decides the
+> exporter's whole shape. See the `exporter-dataset-strategy` project note.
+
+**Regardless of approach:** label only what the pixels actually show (on-screen,
+unfogged, unoccluded) — the engine is omniscient, but truth for a pixel-based system
+must not include fogged/hidden entities (D1). If using engine-*rendered* RGB rather than
+the real screen capture, mind the domain gap (HUD, post-processing) — inference reads
+the real displayed screen.
+
+The schema below is the current, box-oriented contract (harness-side / measurement
+path). It will be extended with the segmentation label form once the render-pass
+question is answered.
+
 ## Boundary — offline only (D1/D6)
 
 Decision **D6**: engine-derived state MAY be used as ground truth for building
@@ -128,6 +167,11 @@ in **screen pixels** (axis-aligned).
 ## What is still missing
 
 This export **producer** is the largest remaining artifact for real-frame accuracy
-(#2) and F1 projection validation (#7). Until a 0 A.D.-side exporter emits documents
-matching this contract, those metrics have nothing to score against, even with real
-recordings (which the `--record` path now captures) in hand.
+(#2), F1 projection validation (#7), and now the auto-labeled training dataset (see
+Purpose above). Until a 0 A.D.-side exporter emits documents matching this contract,
+those metrics have nothing to score against, even with real recordings (which the
+`--record` path now captures) in hand.
+
+**First step before building it:** answer the render-pass question in *Purpose & label
+strategy* — it decides whether the exporter emits segmentation masks (engine-side) or
+camera pose for harness-side projection.
