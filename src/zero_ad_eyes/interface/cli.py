@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
@@ -152,19 +154,38 @@ def _build_live_pipeline(
     profiler: StageProfiler | None = None,
     config: Config | None = None,
     max_frames: int | None = None,
+    record_path: Path | None = None,
 ) -> PerceptionPipeline:
     """The classical chain over live screen capture (EPIC A1), built from config.
 
     ``cfg.acquisition`` supplies the monitor + target FPS; ``max_frames`` bounds an
     otherwise-endless capture (the ``run`` command maps ``--frames`` onto it) so the
     command terminates. Needs a display and the ``mss`` backend to actually grab.
+
+    When ``record_path`` is given (``--record``, A5) the live source is wrapped in a
+    :class:`VideoFrameRecorder` passthrough so every captured frame is persisted to a
+    video file while the pipeline still consumes it — the dataset-collection hand-off
+    for the real-frame validation chain (#1/#2).
     """
 
-    from zero_ad_eyes.infrastructure.acquisition import ScreenCaptureSource
+    from zero_ad_eyes.infrastructure.acquisition import ScreenCaptureSource, VideoFrameRecorder
 
     cfg = config if config is not None else default_config()
-    source = ScreenCaptureSource.from_settings(cfg.acquisition, max_frames=max_frames)
+    source: FrameSource = ScreenCaptureSource.from_settings(cfg.acquisition, max_frames=max_frames)
+    if record_path is not None:
+        source = VideoFrameRecorder.from_settings(source, record_path, cfg.acquisition)
     return _build_pipeline(source, detector=detector, profiler=profiler, config=cfg)
+
+
+def _recording_path(config: Config) -> Path:
+    """A timestamped video file under ``cfg.paths.recordings_dir`` for ``--record``.
+
+    The directory is config-driven (where captures are stored, per the readiness
+    backlog); the container suffix comes from ``cfg.acquisition.record_container``.
+    """
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return config.paths.recordings_dir / f"live_{stamp}{config.acquisition.record_container}"
 
 
 def _synthetic_source(n_frames: int, width: int, height: int) -> object:
@@ -442,6 +463,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="capture the screen live (EPIC A1) from cfg.acquisition; needs a display + mss",
     )
     run.add_argument(
+        "--record",
+        action="store_true",
+        help="persist the live capture to a video file in cfg.paths.recordings_dir "
+        "(A5; codec cfg.acquisition.record_fourcc); requires --live",
+    )
+    run.add_argument(
         "--detector",
         choices=("classical", "stub"),
         default="classical",
@@ -523,10 +550,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "run":
         if args.live and args.recording is not None:
             parser.error("choose one source: --live or --recording, not both")
+        if args.record and not args.live:
+            parser.error("--record requires --live (there is nothing to record otherwise)")
         config = _load_config(args.config)
         if args.live:
+            record_path = _recording_path(config) if args.record else None
+            if record_path is not None:
+                print(f"recording live capture to {record_path}", file=sys.stderr)
             pipeline = _build_live_pipeline(
-                detector=args.detector, config=config, max_frames=args.frames
+                detector=args.detector,
+                config=config,
+                max_frames=args.frames,
+                record_path=record_path,
             )
         elif args.recording is not None:
             pipeline = _build_offline_pipeline(

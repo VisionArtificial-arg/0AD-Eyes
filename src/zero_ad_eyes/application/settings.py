@@ -473,6 +473,8 @@ class AcquisitionSettings(BaseModel):
     image_extensions: tuple[str, ...]
     live_monitor: int = Field(ge=0)  # mss monitor index (0 = the all-monitors virtual)
     live_fps: float = Field(gt=0.0)  # live-capture target pacing
+    record_fourcc: str = Field(min_length=1)  # cv2 FOURCC for --record (e.g. "FFV1" lossless)
+    record_container: str = Field(min_length=1)  # recording file suffix (e.g. ".mkv")
 
 
 class GeometrySettings(BaseModel):

@@ -16,6 +16,7 @@ from .offline import ImageFolderSource, VideoFileSource
 from .recorder import FrameRecorder
 from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource
 from .timing import FramePacer, Tick
+from .video_recorder import VideoFrameRecorder, VideoSink, VideoSinkFactory
 
 
 class InMemoryFrameSource:
@@ -41,4 +42,7 @@ __all__ = [
     "ThreadedFrameSource",
     "Tick",
     "VideoFileSource",
+    "VideoFrameRecorder",
+    "VideoSink",
+    "VideoSinkFactory",
 ]

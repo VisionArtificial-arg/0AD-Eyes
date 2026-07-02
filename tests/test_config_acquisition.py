@@ -16,6 +16,7 @@ def test_defaults_match_historical() -> None:
     assert a.offline_fps == 30.0
     assert a.image_extensions == (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
     assert (a.live_monitor, a.live_fps) == (1, 30.0)
+    assert (a.record_fourcc, a.record_container) == ("FFV1", ".mkv")
 
 
 def test_config_file_threads_offline_fps(tmp_path: Path) -> None:
@@ -52,3 +53,27 @@ def test_build_live_pipeline_wires_live_source_and_fuser() -> None:
     assert isinstance(pipeline, PerceptionPipeline)
     assert isinstance(pipeline._source, ScreenCaptureSource)
     assert pipeline._fuser is not None
+
+
+def test_record_path_wraps_live_source_in_video_recorder(tmp_path: Path) -> None:
+    # --record wraps the live capture in a passthrough recorder (A5) so the pipeline
+    # still consumes frames while they are persisted. Constructed, not run — no display.
+    from zero_ad_eyes.infrastructure.acquisition import VideoFrameRecorder
+    from zero_ad_eyes.interface.cli import _build_live_pipeline
+
+    out = tmp_path / "live.mkv"
+    pipeline = _build_live_pipeline(config=default_config(), max_frames=2, record_path=out)
+
+    assert isinstance(pipeline._source, VideoFrameRecorder)
+    assert pipeline._source.out_path == out
+
+
+def test_run_record_requires_live() -> None:
+    # --record without --live is a usage error: there is no live source to record.
+    import pytest
+
+    from zero_ad_eyes.interface.cli import main
+
+    with pytest.raises(SystemExit) as exc:
+        main(["run", "--record"])
+    assert exc.value.code == 2  # argparse usage error
