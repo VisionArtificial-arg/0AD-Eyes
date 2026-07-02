@@ -37,3 +37,9 @@ eval *ARGS:
 # Launch the perception layer (synthetic source + stub model until adapters land)
 run *ARGS:
     uv run zero-ad-eyes run {{ARGS}}
+
+# Perf benchmark (T6/NF1/NF2): latency percentiles + throughput. Provisional on the
+# stub/classical path; the real NF1 gate closes at MP4. Not in `validate` (timing
+# gates are machine-dependent); the harness logic is covered by pytest instead.
+bench *ARGS:
+    uv run zero-ad-eyes bench {{ARGS}}

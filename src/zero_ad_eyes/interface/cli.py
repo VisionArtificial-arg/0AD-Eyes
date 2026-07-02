@@ -126,6 +126,46 @@ def _run_eval(dataset: str | None) -> int:
     return 1 if verdict is False else 0
 
 
+def _run_bench(
+    *,
+    recording: str | None,
+    detector: str,
+    frames: int,
+    width: int,
+    height: int,
+    warmup: int,
+) -> int:
+    """T6 perf harness. Honest like eval: on the stub/classical path the latency is
+    provisional (the learned inference that dominates NF1 is absent), so it reports
+    but never gates. A real measured failure (model in the loop) exits non-zero."""
+
+    from zero_ad_eyes.infrastructure.perf import benchmark
+
+    if recording is not None:
+        pipeline = _build_offline_pipeline(recording, detector=detector)
+    else:
+        source = _synthetic_source(frames, width, height)
+        pipeline = PerceptionPipeline(source, StubPerceptionModel())  # type: ignore[arg-type]
+
+    report = benchmark(pipeline, warmup=warmup, model_available=False)
+    latency = report.latency
+    print(f"bench: {report.frames} frames measured (warmup {report.warmup})")
+    print(
+        f"  latency ms  p50={latency.p50_ms:.2f}  p95={latency.p95_ms:.2f}  "
+        f"max={latency.max_ms:.2f}  (target <= {report.latency_target_ms:.0f})"
+    )
+    print(
+        f"  throughput  {report.throughput_fps:.1f} fps  "
+        f"(target >= {report.throughput_target_fps:.0f})"
+    )
+    if report.is_provisional:
+        print("  verdict: PROVISIONAL (stub/classical path; real NF1 gate closes at MP4)")
+        return 0
+    passed = report.meets_latency and report.meets_throughput
+    print(f"  verdict: {'PASS' if passed else 'FAIL'}")
+    return 0 if passed else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zero-ad-eyes", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -149,6 +189,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     ev = sub.add_parser("eval", help="run the ML8 accuracy harness (NF3 metrics)")
     ev.add_argument("--dataset", default=None, help="JSON with {predicted, truth} world models")
 
+    bench = sub.add_parser("bench", help="benchmark latency + throughput (T6/NF1/NF2)")
+    bench.add_argument("--frames", type=int, default=100)
+    bench.add_argument("--width", type=int, default=1280)
+    bench.add_argument("--height", type=int, default=720)
+    bench.add_argument("--warmup", type=int, default=5)
+    bench.add_argument(
+        "--recording", default=None, help="benchmark the real classical chain over a recording"
+    )
+    bench.add_argument("--detector", choices=("stub", "classical"), default="stub")
+
     args = parser.parse_args(argv)
 
     if args.command == "run":
@@ -163,6 +213,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "eval":
         return _run_eval(args.dataset)
+
+    if args.command == "bench":
+        return _run_bench(
+            recording=args.recording,
+            detector=args.detector,
+            frames=args.frames,
+            width=args.width,
+            height=args.height,
+            warmup=args.warmup,
+        )
 
     parser.error(f"unknown command: {args.command}")
     return 2
