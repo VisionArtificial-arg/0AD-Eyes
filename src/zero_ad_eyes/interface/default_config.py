@@ -201,7 +201,9 @@ def _default_minimap() -> MinimapSettings:
         fog=FogSettings(rows=16, cols=16, unexplored_max=25.0, visible_min=140.0),
         blips=BlipSettings(tolerance=70.0, min_area=1, max_area=60, confidence=0.8),
         territory=TerritorySettings(tolerance=90.0, min_area=64),
-        viewport=ViewportSettings(white_min=200, min_area=64, min_side=8),
+        viewport=ViewportSettings(
+            white_min=200, min_area=64, min_side=8, approx_epsilon_fraction=0.02
+        ),
         disc_shape=False,
         region_confidence=0.9,
     )

@@ -12,7 +12,7 @@ from zero_ad_eyes.domain.confidence import Confidence
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import ScreenBBox, WorldPoint
 from zero_ad_eyes.domain.hud import HudState, Population
-from zero_ad_eyes.domain.minimap import Blip, FogState, MinimapModel, ViewportRect
+from zero_ad_eyes.domain.minimap import Blip, FogState, MinimapModel, ViewportQuad
 from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership, Phase, ResourceType
 from zero_ad_eyes.domain.world_model import WorldModel
 from zero_ad_eyes.interface.overlay import render
@@ -126,9 +126,11 @@ def test_minimap_blips_and_viewport_are_drawn() -> None:
                 confidence=Confidence.unknown(),
             ),
         ),
-        viewport=ViewportRect(
+        viewport=ViewportQuad(
             top_left=WorldPoint(x=2.0, y=2.0),
+            top_right=WorldPoint(x=8.0, y=2.0),
             bottom_right=WorldPoint(x=8.0, y=8.0),
+            bottom_left=WorldPoint(x=2.0, y=8.0),
         ),
         confidence=Confidence.unknown(),
     )

@@ -11,7 +11,7 @@ from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import ScreenBBox, WorldPoint
 from zero_ad_eyes.domain.hud import HudState, Population
-from zero_ad_eyes.domain.minimap import Blip, MinimapModel, ViewportRect
+from zero_ad_eyes.domain.minimap import Blip, MinimapModel, ViewportQuad
 from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership, Phase, ResourceType
 from zero_ad_eyes.domain.world_model import WorldModel
 from zero_ad_eyes.infrastructure.contract.serialization import WorldModelCodec
@@ -46,9 +46,11 @@ def rich_world_model(frame_id: int = 0) -> WorldModel:
                     confidence=Confidence(value=0.8, provenance=Provenance.CLASSICAL),
                 ),
             ),
-            viewport=ViewportRect(
+            viewport=ViewportQuad(
                 top_left=WorldPoint(x=0.0, y=0.0),
+                top_right=WorldPoint(x=10.0, y=0.0),
                 bottom_right=WorldPoint(x=10.0, y=10.0),
+                bottom_left=WorldPoint(x=0.0, y=10.0),
             ),
             confidence=Confidence.certain(),
         ),

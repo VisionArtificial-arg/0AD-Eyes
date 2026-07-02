@@ -26,37 +26,54 @@ def _projector(seg: Segmentation) -> MinimapProjector:
     )
 
 
-def test_extracts_the_camera_rectangle_corners() -> None:
+def _detector() -> ViewportDetector:
+    return ViewportDetector(white_min=200, min_area=64, min_side=8, approx_epsilon_fraction=0.02)
+
+
+def test_extracts_the_camera_quad_corners() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
     cv2.rectangle(region, (20, 25), (60, 55), (255, 255, 255), thickness=1)
 
     seg = _full_segmentation(region)
     proj = _projector(seg)
-    rect = ViewportDetector(white_min=200, min_area=64, min_side=8).detect(seg, proj)
+    quad = _detector().detect(seg, proj)
 
-    assert rect is not None
+    assert quad is not None
     tl = proj.to_world(20.0, 25.0)
+    tr = proj.to_world(60.0, 25.0)
     br = proj.to_world(60.0, 55.0)
-    assert abs(rect.top_left.x - tl.x) < 2.0
-    assert abs(rect.top_left.y - tl.y) < 2.0
-    assert abs(rect.bottom_right.x - br.x) < 2.0
-    assert abs(rect.bottom_right.y - br.y) < 2.0
+    bl = proj.to_world(20.0, 55.0)
+    assert abs(quad.top_left.x - tl.x) < 2.0 and abs(quad.top_left.y - tl.y) < 2.0
+    assert abs(quad.top_right.x - tr.x) < 2.0 and abs(quad.top_right.y - tr.y) < 2.0
+    assert abs(quad.bottom_right.x - br.x) < 2.0 and abs(quad.bottom_right.y - br.y) < 2.0
+    assert abs(quad.bottom_left.x - bl.x) < 2.0 and abs(quad.bottom_left.y - bl.y) < 2.0
+
+
+def test_extracts_a_perspective_trapezoid() -> None:
+    # A tilted-camera footprint: the far (top) edge is narrower than the near edge.
+    # A general quad must preserve this; an axis-aligned bbox would not.
+    region = np.zeros((80, 80, 3), dtype=np.uint8)
+    trapezoid = np.array([[30, 20], [50, 20], [65, 60], [15, 60]], dtype=np.int32)
+    cv2.polylines(region, [trapezoid], True, (255, 255, 255), thickness=1)
+
+    seg = _full_segmentation(region)
+    proj = _projector(seg)
+    quad = _detector().detect(seg, proj)
+
+    assert quad is not None
+    top_width = abs(quad.top_right.x - quad.top_left.x)
+    bottom_width = abs(quad.bottom_right.x - quad.bottom_left.x)
+    assert top_width < bottom_width  # foreshortening preserved
 
 
 def test_no_viewport_returns_none() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
     seg = _full_segmentation(region)
-    assert (
-        ViewportDetector(white_min=200, min_area=64, min_side=8).detect(seg, _projector(seg))
-        is None
-    )
+    assert _detector().detect(seg, _projector(seg)) is None
 
 
 def test_small_white_blip_is_not_a_viewport() -> None:
     region = np.zeros((80, 80, 3), dtype=np.uint8)
     cv2.circle(region, (40, 40), 2, (255, 255, 255), thickness=-1)
     seg = _full_segmentation(region)
-    assert (
-        ViewportDetector(white_min=200, min_area=64, min_side=8).detect(seg, _projector(seg))
-        is None
-    )
+    assert _detector().detect(seg, _projector(seg)) is None

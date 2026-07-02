@@ -6,7 +6,7 @@ from zero_ad_eyes.application.settings import GeometrySettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import WorldPoint
-from zero_ad_eyes.domain.minimap import Blip, MinimapModel, ViewportRect
+from zero_ad_eyes.domain.minimap import Blip, MinimapModel, ViewportQuad
 from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership
 from zero_ad_eyes.infrastructure.tracking import (
     ClassicalEntityFuser,
@@ -121,8 +121,15 @@ def _blip(
     )
 
 
-def _viewport(x0: float, y0: float, x1: float, y1: float) -> ViewportRect:
-    return ViewportRect(top_left=WorldPoint(x=x0, y=y0), bottom_right=WorldPoint(x=x1, y=y1))
+def _viewport(x0: float, y0: float, x1: float, y1: float) -> ViewportQuad:
+    # An axis-aligned quad is the degenerate (top-down) footprint; enough to exercise
+    # the on/off-viewport containment logic the fuser relies on.
+    return ViewportQuad(
+        top_left=WorldPoint(x=x0, y=y0),
+        top_right=WorldPoint(x=x1, y=y0),
+        bottom_right=WorldPoint(x=x1, y=y1),
+        bottom_left=WorldPoint(x=x0, y=y1),
+    )
 
 
 _FUSER = ClassicalEntityFuser(match_radius=20.0, agreement_scale=1.0)

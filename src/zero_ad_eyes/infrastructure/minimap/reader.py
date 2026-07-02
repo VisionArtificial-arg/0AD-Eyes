@@ -75,6 +75,7 @@ class ClassicalMinimapReader:
                 white_min=settings.viewport.white_min,
                 min_area=settings.viewport.min_area,
                 min_side=settings.viewport.min_side,
+                approx_epsilon_fraction=settings.viewport.approx_epsilon_fraction,
             ),
             territory_extractor=TerritoryExtractor(
                 palette=palette,

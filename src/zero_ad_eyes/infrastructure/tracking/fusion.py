@@ -21,7 +21,7 @@ from zero_ad_eyes.application.settings import GeometrySettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import WorldPoint
-from zero_ad_eyes.domain.minimap import MinimapModel, ViewportRect
+from zero_ad_eyes.domain.minimap import MinimapModel
 from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership
 from zero_ad_eyes.infrastructure.geometry.fusion import reconcile
 
@@ -146,14 +146,6 @@ def fuse_entities(
     return tuple(merged)
 
 
-def _inside_viewport(point: WorldPoint, viewport: ViewportRect) -> bool:
-    """Whether a world point falls within the camera viewport rect (order-agnostic)."""
-
-    x_lo, x_hi = sorted((viewport.top_left.x, viewport.bottom_right.x))
-    y_lo, y_hi = sorted((viewport.top_left.y, viewport.bottom_right.y))
-    return x_lo <= point.x <= x_hi and y_lo <= point.y <= y_hi
-
-
 class ClassicalEntityFuser:
     """``EntityFuser`` adapter (G4/G5): folds minimap blips into the entity set.
 
@@ -198,7 +190,7 @@ class ClassicalEntityFuser:
         base = max((e.entity_id for e in entities), default=-1) + 1
         hints: list[Entity] = []
         for offset, blip in enumerate(minimap.blips):
-            if _inside_viewport(blip.world_pos, minimap.viewport):
+            if minimap.viewport.contains(blip.world_pos):
                 continue  # on-screen: already tracked from the main view; skip (no double-count)
             hints.append(
                 Entity(

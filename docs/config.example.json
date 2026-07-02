@@ -320,7 +320,8 @@
     "viewport": {
       "white_min": 200,
       "min_area": 64,
-      "min_side": 8
+      "min_side": 8,
+      "approx_epsilon_fraction": 0.02
     },
     "disc_shape": false,
     "region_confidence": 0.9

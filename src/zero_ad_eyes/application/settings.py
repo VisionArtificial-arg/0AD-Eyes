@@ -283,13 +283,14 @@ class TerritorySettings(BaseModel):
 
 
 class ViewportSettings(BaseModel):
-    """Camera-viewport rectangle extraction knobs (D5)."""
+    """Camera-viewport quad extraction knobs (D5)."""
 
     model_config = ConfigDict(frozen=True)
 
     white_min: int = Field(ge=0, le=255)
     min_area: int = Field(ge=0)
     min_side: int = Field(ge=0)
+    approx_epsilon_fraction: float = Field(gt=0.0, le=1.0)  # approxPolyDP tol (frac of perimeter)
 
 
 class MinimapSettings(BaseModel):

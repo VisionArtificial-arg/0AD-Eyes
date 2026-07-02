@@ -228,8 +228,9 @@ def _world_bounds(minimap: MinimapModel) -> tuple[float, float, float, float] | 
         xs.append(blip.world_pos.x)
         ys.append(blip.world_pos.y)
     if minimap.viewport is not None:
-        xs.extend([minimap.viewport.top_left.x, minimap.viewport.bottom_right.x])
-        ys.extend([minimap.viewport.top_left.y, minimap.viewport.bottom_right.y])
+        for corner in minimap.viewport.corners():
+            xs.append(corner.x)
+            ys.append(corner.y)
     if not xs or not ys:
         return None
 
@@ -281,6 +282,6 @@ def _draw_viewport(
     viewport = minimap.viewport
     if viewport is None:
         return
-    top_left = _project(viewport.top_left.x, viewport.top_left.y, bounds, panel)
-    bottom_right = _project(viewport.bottom_right.x, viewport.bottom_right.y, bounds, panel)
-    cv2.rectangle(canvas, top_left, bottom_right, (255, 255, 255), 1)
+    points = [_project(corner.x, corner.y, bounds, panel) for corner in viewport.corners()]
+    for index in range(len(points)):
+        cv2.line(canvas, points[index], points[(index + 1) % len(points)], (255, 255, 255), 1)
