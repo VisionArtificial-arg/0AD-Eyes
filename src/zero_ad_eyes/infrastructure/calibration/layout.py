@@ -18,6 +18,7 @@ width/height/ui_scale (A4), anchor-refined where feasible, ratio-fallback otherw
 from __future__ import annotations
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import CalibrationSettings
 from zero_ad_eyes.domain.calibration import Calibration
 
 from .anchors import bottom_band_fraction, top_band_fraction
@@ -49,12 +50,32 @@ class HudCalibrator:
         store: CalibrationProfileStore | None = None,
         use_anchors: bool = True,
         default_ui_scale: float = 1.0,
+        ui_scale_min: float = _UI_SCALE_MIN,
+        ui_scale_max: float = _UI_SCALE_MAX,
     ) -> None:
         self._ratios = ratios or HudLayoutRatios()
         self._theme = theme
         self._store = store
         self._use_anchors = use_anchors
         self._default_ui_scale = default_ui_scale
+        self._ui_scale_min = ui_scale_min
+        self._ui_scale_max = ui_scale_max
+
+    @classmethod
+    def from_settings(
+        cls, settings: CalibrationSettings, *, store: CalibrationProfileStore | None = None
+    ) -> HudCalibrator:
+        """Build from pure config (Approach B). ``store`` (B3) is wired separately."""
+
+        return cls(
+            HudLayoutRatios.model_validate(settings.ratios.model_dump()),
+            theme=settings.theme,
+            store=store,
+            use_anchors=settings.use_anchors,
+            default_ui_scale=settings.default_ui_scale,
+            ui_scale_min=settings.ui_scale_min,
+            ui_scale_max=settings.ui_scale_max,
+        )
 
     @property
     def theme(self) -> str:
@@ -109,4 +130,4 @@ class HudCalibrator:
         if top_anchor is None:
             return self._default_ui_scale
         estimated = top_anchor / self._ratios.top_bar_height
-        return clamp(estimated, _UI_SCALE_MIN, _UI_SCALE_MAX)
+        return clamp(estimated, self._ui_scale_min, self._ui_scale_max)

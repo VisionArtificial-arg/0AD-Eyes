@@ -527,6 +527,39 @@ class PreprocessingSettings(BaseModel):
     scene: ScenePipelineSettings = Field(default_factory=ScenePipelineSettings)
 
 
+# --------------------------------------------------------------------------- #
+# Calibration tuning — pure DATA (Approach B): HUD region ratios + UI-scale     #
+# bounds + self-check thresholds (EPIC B). ``ratios`` field names mirror         #
+# HudLayoutRatios so the boundary mapping is a model_validate.                   #
+# --------------------------------------------------------------------------- #
+
+
+class HudLayoutRatiosSettings(BaseModel):
+    """Resolution-relative HUD region fractions (B2); mirrors HudLayoutRatios."""
+
+    model_config = ConfigDict(frozen=True)
+
+    top_bar_height: float = Field(default=0.035, gt=0.0, le=1.0)
+    minimap_side: float = Field(default=0.20, gt=0.0, le=1.0)
+    selection_width: float = Field(default=0.34, gt=0.0, le=1.0)
+    selection_height: float = Field(default=0.16, gt=0.0, le=1.0)
+
+
+class CalibrationSettings(BaseModel):
+    """Classical HUD-calibration tuning (EPIC B), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    ratios: HudLayoutRatiosSettings = Field(default_factory=HudLayoutRatiosSettings)
+    theme: str = "default"
+    use_anchors: bool = True
+    default_ui_scale: float = Field(default=1.0, gt=0.0)
+    ui_scale_min: float = Field(default=0.5, gt=0.0)  # UI-scale clamp lower bound (B1)
+    ui_scale_max: float = Field(default=3.0, gt=0.0)  # UI-scale clamp upper bound (B1)
+    selfcheck_match_threshold: float = Field(default=0.5, ge=0.0, le=1.0)  # B4
+    selfcheck_use_anchors: bool = True
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -549,3 +582,4 @@ class Config(BaseModel):
     hud: HudSettings = Field(default_factory=HudSettings)
     tracking: TrackingSettings = Field(default_factory=TrackingSettings)
     preprocessing: PreprocessingSettings = Field(default_factory=PreprocessingSettings)
+    calibration: CalibrationSettings = Field(default_factory=CalibrationSettings)

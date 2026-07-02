@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import CalibrationSettings
 from zero_ad_eyes.domain.calibration import Calibration, CalibrationCheck
 
 from .anchors import bottom_band_fraction, top_band_fraction
@@ -44,6 +45,15 @@ class LayoutSelfCheck:
     ) -> None:
         self._match_threshold = match_threshold
         self._use_anchors = use_anchors
+
+    @classmethod
+    def from_settings(cls, settings: CalibrationSettings) -> LayoutSelfCheck:
+        """Build from pure config (Approach B boundary mapping)."""
+
+        return cls(
+            match_threshold=settings.selfcheck_match_threshold,
+            use_anchors=settings.selfcheck_use_anchors,
+        )
 
     def verify(self, frame: Frame, calibration: Calibration) -> CalibrationCheck:
         width, height = self._resolution(frame)
