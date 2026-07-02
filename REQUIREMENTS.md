@@ -44,14 +44,22 @@ Snapshot of what is built. Checkboxes below are kept in sync with this table.
   eventual target.
 - **Onion fix:** config value-object *types* live in `application.settings`; the
   JSON/env loader stays in `infrastructure.config` (no interface→infra sideways dep).
-- **CLI:** `zero-ad-eyes run --recording PATH` drives the full classical chain
-  (`--detector classical` opts into the E6a baseline; the model seam stays stubbed).
-- **Gate/DX:** `just eval` runs the real harness; git hooks (`pre-commit=check`,
-  `pre-push=validate`) + `just setup`.
+- **CLI:** `zero-ad-eyes run` drives the full classical chain; `--recording PATH`
+  runs it over real frames. The detection model defaults to **`classical`** (the
+  E6a/E11 baseline); `--detector stub` is plumbing-only.
+- **Gate/DX:** `just eval` runs the real harness; `just bench` (T6/NF6); git hooks
+  (`pre-commit=check`, `pre-push=validate`) + `just setup`.
 
-**Reached:** M0–M2, **M3-scaffold**, M4, M5, and the non-🔌 parts of M6. **DoD-A**
-(this team's scope, stub proving the seam) is met except T4/T6. **DoD-B** remains
-open on the model artifact (MP4) and the NF1/NF3 gates it unblocks.
+**Strategic decision (2026-07-02): v1 ships on the classical path; the learned model
+is a later drop-in upgrade, not a blocker.** No team is building the learned detector,
+so it is demoted from a gating dependency to an optional quality upgrade behind the
+`PerceptionModel` port. Consequences: v1 taxonomy is **coarse** (A3/OQ-4 revised); the
+**MP2 contract is provisional on model-internal fields** (input tensor spec `None`
+until a model exists — see §5.10.2); the shipped default detector is **classical**.
+
+**Reached:** M0–M2, **M3-scaffold** (= the classical v1), M4, M5, and the non-🔌 parts
+of M6. **DoD-A (classical v1)** is met except T4/T6. **DoD-B (with the learned model)**
+is the later upgrade — open on the model artifact (MP4) and the NF1/NF3 gates it unblocks.
 
 ---
 
@@ -112,9 +120,12 @@ State explicitly; each is an assumption, not a fact, until confirmed.
   entities with health bars). No radical UI mods.
 - **A2** The decision layer runs in the same process space or over a local IPC
   boundary; the contract can be an in-process object or a serialized message.
-- **A3** Taxonomy scope (OQ-4): **multi-civilization, exact entity types**. The
-  taxonomy enumerates precise unit/building/resource types across the targeted
-  civilizations; it is config-driven (NF7) and extensible.
+- **A3** Taxonomy scope (OQ-4) — **revised 2026-07**: **v1 ships coarse
+  `EntityKind`** (unit / building / resource-node / projectile / other). Exact
+  multi-civ per-unit/building types are **deferred to the learned model** (a v1.1
+  additive extension, `entity_type_by_class_id`), because nothing on the classical
+  path can emit them and they are the project's hardest target (R1b). The `entity_type`
+  free-string field carries a fine type when one is legible; it stays config-driven (NF7).
 - **A6** Perspective (OQ-5): **single-player, own point-of-view only.** Only the
   playing player's screen/HUD is captured. Enemy resources, population, and any
   fog-hidden state are **physically unobservable** and must never be promised to
@@ -375,9 +386,13 @@ a model, a framework, or weights.
       Detections`, where `Detections` is a stable value object
       (per item: mask/bbox in a documented coordinate convention, class label from
       the §4.3 taxonomy, score/confidence; plus optional dense segmentation map).
-- [x] **MP2** Freeze the **I/O contract**: input tensor spec (size, channel order,
-      normalization from EPIC P), output schema, class-id↔taxonomy mapping,
-      coordinate + scale convention. Versioned; the model team builds to this.
+- [x] **MP2** The **I/O contract** — **provisional (2026-07)**: the downstream
+      -invariant half is frozen (output schema, coordinate + scale convention,
+      mandatory confidence+provenance, **coarse** class-id↔taxonomy map) and enforced
+      by MP5 parity. The **model-internal input tensor spec is deferred** (`input` is
+      `None`, `is_provisional`) — with no model being built, committing a specific
+      size/normalization now would be a guess; a real model fills it via
+      `committed_contract()` at hand-off. Versioned (`CONTRACT_VERSION`).
       - Each detection carries a **first-class confidence** *and* a **provenance
         tag** (`classical` E6a / `learned` E6b, extensible to other elements) so
         downstream (G/H) weights coarse-vs-refined signals identically whether they
@@ -525,11 +540,13 @@ always the locked one.
    (EPIC B+C), classical/template path (CV-07/08/09).
 3. **M2 Minimap:** blips, fog, territory, viewport rect (EPIC D).
 4. **M3 Entities:** split by the model boundary —
-   - **M3-scaffold `[this team, now]`:** model port + stub adapter (MP1–MP3),
-     classical/ownership/health path (E3/E4/E5/E6a/E7/E10/E11), camera geometry (F).
-     Runs end-to-end on the stub.
-   - **M3-live `[🔌 blocked on model]`:** real detection/classification/segmentation
-     (E1/E2/E6b/E8/E9) via the real adapter (MP4). *Only* part gated on the model team.
+   - **M3-scaffold = the classical v1 `[this team, shipped]`:** model port + stub +
+     classical detection baseline (MP1–MP3, E6a/E11), ownership/health/state
+     (E3/E4/E5/E7/E10), camera geometry (F). Perceives end-to-end from pixels today;
+     this is what v1 ships on (2026-07 decision).
+   - **M3-live = optional later upgrade `[🔌 needs a learned model]`:** real
+     detection/classification/segmentation (E1/E2/E6b/E8/E9) via the real adapter
+     (MP4). A quality upgrade behind the same port, **not** a gate on v1.
 5. **M4 Temporal:** tracking + memory + fusion into the world model (G). Built and
    tested against the stub; no model dependency.
 6. **M5 Contract:** versioned output + decision-layer integration (H). No model dep.
@@ -600,6 +617,9 @@ always the locked one.
 - **OQ-3 — OPEN (non-blocking until M5):** exact IPC/contract mechanism
   (in-process object vs local socket vs shared memory). Schema stays
   transport-agnostic (§4.7) until then.
-- **OQ-4 — RESOLVED:** multi-civilization, exact entity types (A3).
+- **OQ-4 — REVISED (2026-07):** **v1 = coarse `EntityKind`;** exact multi-civ types
+  deferred to the learned model as a later additive extension (A3). Originally
+  "resolved: exact types", re-scoped once it was decided no model team is building
+  the learned detector and v1 ships on the classical path.
 - **OQ-5 — RESOLVED:** single-player, own-POV only (A6); enemy/fog-hidden state is
   unobservable by construction.
