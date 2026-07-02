@@ -134,3 +134,55 @@ def test_export_json_round_trip(tmp_path: Path) -> None:
     reloaded = EngineStateExport.load(path)
 
     assert reloaded == export
+
+
+# --- Alignment on real-capture clocks (drift hardening, R5) --------------------- #
+
+
+def test_align_by_frame_id_matches_non_zero_based_capture_ids() -> None:
+    # A real capture's frame ids do not start at 0; the sidecar restores them and the
+    # engine export is keyed to the same ids. Exact-id alignment must still pair them.
+    export = EngineStateExport(
+        match_id="m",
+        self_player=1,
+        frames=(
+            EngineFrameState(frame_id=100, timestamp=12.5),
+            EngineFrameState(frame_id=101, timestamp=12.9),
+        ),
+    )
+    aligner = GroundTruthAligner(export)
+
+    aligned = aligner.align_by_frame_id([_meta(100, 12.5), _meta(101, 12.9)])
+
+    assert [label.frame_id for label in aligned] == [100, 101]
+
+
+def test_align_by_timestamp_maps_several_captures_to_one_engine_frame() -> None:
+    # Capture fps > engine-export fps: several captured frames fall within tolerance of
+    # the same engine frame. Each keeps its own id and is scored against that frame.
+    export = EngineStateExport(
+        match_id="m",
+        self_player=1,
+        frames=(
+            EngineFrameState(frame_id=0, timestamp=0.0),
+            EngineFrameState(frame_id=1, timestamp=0.5),
+        ),
+    )
+    aligner = GroundTruthAligner(export)
+
+    aligned = aligner.align_by_timestamp(
+        [_meta(10, 0.00), _meta(11, 0.03), _meta(12, 0.06)], tolerance=0.1
+    )
+
+    assert [label.frame_id for label in aligned] == [10, 11, 12]
+
+
+def test_align_by_timestamp_tolerance_boundary_is_inclusive() -> None:
+    export = EngineStateExport(
+        match_id="m", self_player=1, frames=(EngineFrameState(frame_id=0, timestamp=0.0),)
+    )
+    aligner = GroundTruthAligner(export)
+
+    # A delta exactly equal to the tolerance still matches; just beyond it does not.
+    assert len(aligner.align_by_timestamp([_meta(1, 0.10)], tolerance=0.1)) == 1
+    assert aligner.align_by_timestamp([_meta(1, 0.11)], tolerance=0.1) == ()
