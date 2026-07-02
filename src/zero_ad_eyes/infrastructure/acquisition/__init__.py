@@ -14,6 +14,7 @@ from zero_ad_eyes.application.frames import Frame
 from .backpressure import BoundedFrameBuffer, ThreadedFrameSource
 from .offline import ImageFolderSource, VideoFileSource
 from .recorder import FrameRecorder
+from .recording import FrameStamp, RecordingManifest
 from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource
 from .timing import FramePacer, Tick
 from .video_recorder import VideoFrameRecorder, VideoSink, VideoSinkFactory
@@ -34,10 +35,12 @@ __all__ = [
     "CaptureRegion",
     "FramePacer",
     "FrameRecorder",
+    "FrameStamp",
     "Grabber",
     "ImageFolderSource",
     "InMemoryFrameSource",
     "MssGrabber",
+    "RecordingManifest",
     "ScreenCaptureSource",
     "ThreadedFrameSource",
     "Tick",

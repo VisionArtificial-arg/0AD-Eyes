@@ -19,6 +19,9 @@ Design notes:
 - The codec (``FFV1`` lossless by default) comes from ``acquisition`` config so the
   fidelity trade-off is a config decision, not a hidden default — lossy compression
   would inject artifacts into the very pixels the classical readers measure (NF3/#2).
+- Alongside the video it writes a ``RecordingManifest`` sidecar (same stem, ``.json``)
+  carrying each frame's true ``frame_id``/``timestamp`` — the temporal provenance the
+  video drops but ground-truth alignment (#2) needs. See :mod:`.recording`.
 - The writer construction is injected (``writer_factory``) so tests exercise the
   lifecycle without a real codec or display.
 """
@@ -34,6 +37,8 @@ import cv2
 from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.application.ports import FrameSource
 from zero_ad_eyes.application.settings import AcquisitionSettings
+
+from .recording import FrameStamp, RecordingManifest
 
 
 class VideoSink(Protocol):
@@ -102,21 +107,54 @@ class VideoFrameRecorder:
 
         return self._path
 
+    @property
+    def manifest_path(self) -> Path:
+        """The sidecar carrying each frame's true clock (video stem, ``.json``)."""
+
+        return self._path.with_suffix(".json")
+
     def frames(self) -> Iterator[Frame]:
         sink: VideoSink | None = None
+        stamps: list[FrameStamp] = []
+        source_name: str | None = None
         try:
             for frame in self._source.frames():
                 if sink is None:
                     height, width = frame.image.shape[:2]
                     self._path.parent.mkdir(parents=True, exist_ok=True)
-                    sink = self._new_sink(str(self._path), self._fourcc, self._fps, (width, height))
-                    if not sink.isOpened():
+                    candidate = self._new_sink(
+                        str(self._path), self._fourcc, self._fps, (width, height)
+                    )
+                    if not candidate.isOpened():
+                        candidate.release()
                         raise OSError(
                             f"cannot open video writer for {self._path} "
                             f"(codec {self._fourcc!r} unavailable?)"
                         )
+                    sink = candidate  # marks a genuinely-open recording (manifest gets written)
+                    source_name = frame.meta.source
                 sink.write(frame.image)
+                stamps.append(
+                    FrameStamp(frame_id=frame.meta.frame_id, timestamp=frame.meta.timestamp)
+                )
                 yield frame
         finally:
             if sink is not None:
                 sink.release()
+                self._write_manifest(stamps, source_name)
+
+    def _write_manifest(self, stamps: list[FrameStamp], source_name: str | None) -> None:
+        """Persist the temporal sidecar for whatever frames were actually recorded.
+
+        Runs in ``frames``' ``finally`` so an interrupted or bounded capture still
+        indexes the frames it did write; only reached once the video opened, so a
+        failed-to-open recording leaves no orphan manifest.
+        """
+
+        manifest = RecordingManifest(
+            video=self._path.name,
+            source=source_name if source_name is not None else "unknown",
+            fps=self._fps,
+            stamps=tuple(stamps),
+        )
+        manifest.save(self.manifest_path)
