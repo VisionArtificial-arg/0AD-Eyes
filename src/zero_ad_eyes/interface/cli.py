@@ -62,20 +62,21 @@ def _perception_model(detector: str, config: Config) -> PerceptionModel:
     return StubPerceptionModel()
 
 
-def _build_offline_pipeline(
-    recording: str,
+def _build_pipeline(
+    source: FrameSource,
     *,
     detector: str = "classical",
     profiler: StageProfiler | None = None,
     config: Config | None = None,
 ) -> PerceptionPipeline:
-    """Wire the real classical chain over a recording (EPIC A→G integration).
+    """Wire the real classical chain over any ``FrameSource`` (EPIC A→G integration).
 
-    Every stage is a real classical adapter: offline source, preprocessing, HUD
-    calibration + self-check, HUD/minimap readers, IoU tracker, entity enricher, and
-    the classical detection baseline (E6a/E11) — the v1 default. ``--detector stub``
-    swaps in the empty stub for plumbing-only runs; a learned adapter (MP4) would
-    swap in here identically.
+    Every stage is a real classical adapter: preprocessing, HUD calibration +
+    self-check, HUD/minimap readers, IoU tracker, entity enricher, minimap fusion
+    (G4/G5), and the classical detection baseline (E6a/E11) — the v1 default.
+    ``--detector stub`` swaps in the empty stub for plumbing-only runs; a learned
+    adapter (MP4) would swap in here identically. The ``source`` (offline recording
+    or live capture) is chosen by the caller.
 
     This is the composition root where config is read (NF7): each adapter is built
     ``from_settings`` of the typed :class:`Config` (the generated defaults when none
@@ -87,12 +88,16 @@ def _build_offline_pipeline(
     from zero_ad_eyes.infrastructure.minimap.reader import ClassicalMinimapReader
     from zero_ad_eyes.infrastructure.perception import ClassicalEntityEnricher
     from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
-    from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector, IouTracker
+    from zero_ad_eyes.infrastructure.tracking import (
+        ClassicalEntityFuser,
+        ClassicalEventDetector,
+        IouTracker,
+    )
 
     cfg = config if config is not None else default_config()
 
     return PerceptionPipeline(
-        _offline_source(recording, cfg.acquisition),
+        source,
         _perception_model(detector, cfg),
         preprocessor=PreprocessingPipeline(),
         calibrator=HudCalibrator.from_settings(cfg.calibration),
@@ -102,9 +107,49 @@ def _build_offline_pipeline(
         recalibrate_interval=cfg.pipeline.recalibrate_interval,
         tracker=IouTracker.from_settings(cfg.tracking),
         enricher=ClassicalEntityEnricher.from_settings(cfg.perception),
+        fuser=ClassicalEntityFuser.from_settings(cfg.geometry),
         event_detector=ClassicalEventDetector.from_settings(cfg.tracking),
         profiler=profiler,
     )
+
+
+def _build_offline_pipeline(
+    recording: str,
+    *,
+    detector: str = "classical",
+    profiler: StageProfiler | None = None,
+    config: Config | None = None,
+) -> PerceptionPipeline:
+    """The classical chain over a recording (image folder or video)."""
+
+    cfg = config if config is not None else default_config()
+    return _build_pipeline(
+        _offline_source(recording, cfg.acquisition),
+        detector=detector,
+        profiler=profiler,
+        config=cfg,
+    )
+
+
+def _build_live_pipeline(
+    *,
+    detector: str = "classical",
+    profiler: StageProfiler | None = None,
+    config: Config | None = None,
+    max_frames: int | None = None,
+) -> PerceptionPipeline:
+    """The classical chain over live screen capture (EPIC A1), built from config.
+
+    ``cfg.acquisition`` supplies the monitor + target FPS; ``max_frames`` bounds an
+    otherwise-endless capture (the ``run`` command maps ``--frames`` onto it) so the
+    command terminates. Needs a display and the ``mss`` backend to actually grab.
+    """
+
+    from zero_ad_eyes.infrastructure.acquisition import ScreenCaptureSource
+
+    cfg = config if config is not None else default_config()
+    source = ScreenCaptureSource.from_settings(cfg.acquisition, max_frames=max_frames)
+    return _build_pipeline(source, detector=detector, profiler=profiler, config=cfg)
 
 
 def _synthetic_source(n_frames: int, width: int, height: int) -> object:
@@ -356,13 +401,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="run the pipeline (classical detection by default)")
-    run.add_argument("--frames", type=int, default=3)
+    run.add_argument(
+        "--frames",
+        type=int,
+        default=3,
+        help="frames to emit (synthetic source; also bounds --live so it terminates)",
+    )
     run.add_argument("--width", type=int, default=1280)
     run.add_argument("--height", type=int, default=720)
     run.add_argument(
         "--recording",
         default=None,
         help="path to a recording (image folder or video); drives the real classical chain",
+    )
+    run.add_argument(
+        "--live",
+        action="store_true",
+        help="capture the screen live (EPIC A1) from cfg.acquisition; needs a display + mss",
     )
     run.add_argument(
         "--detector",
@@ -444,8 +499,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "run":
+        if args.live and args.recording is not None:
+            parser.error("choose one source: --live or --recording, not both")
         config = _load_config(args.config)
-        if args.recording is not None:
+        if args.live:
+            pipeline = _build_live_pipeline(
+                detector=args.detector, config=config, max_frames=args.frames
+            )
+        elif args.recording is not None:
             pipeline = _build_offline_pipeline(
                 args.recording, detector=args.detector, config=config
             )

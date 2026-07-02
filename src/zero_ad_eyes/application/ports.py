@@ -104,6 +104,19 @@ class EntityEnricher(Protocol):
 
 
 @runtime_checkable
+class EntityFuser(Protocol):
+    """EPIC G/G4/G5 — reconciles the tracked entities with the minimap surface.
+
+    Folds cross-surface knowledge (minimap blips) into the tracked entity set:
+    matched observations are merged confidence-weighted, and observations known only
+    to the minimap (e.g. units off the main viewport) are surfaced as their own
+    entities. Runs after enrichment, on the final entity set for the frame.
+    """
+
+    def fuse(self, entities: tuple[Entity, ...], minimap: MinimapModel) -> tuple[Entity, ...]: ...
+
+
+@runtime_checkable
 class EventSource(Protocol):
     """EPIC G/G8 — derives discrete world events from frame-over-frame entity changes.
 

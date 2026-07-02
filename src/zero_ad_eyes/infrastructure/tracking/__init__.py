@@ -14,7 +14,7 @@ domain types so the same code serves stub and real perception equally.
 from __future__ import annotations
 
 from .events import ClassicalEventDetector, EventDetector, EventKind, TrackingEvent
-from .fusion import fuse_entities, resolve_conflict
+from .fusion import ClassicalEntityFuser, fuse_entities, resolve_conflict
 from .motion import FarnebackMotionEstimator, Motion, motion_from_trajectory
 from .spatial import OccupancyGrid, distance, neighbours, proximity_pairs
 from .temporal import TemporalStabilizer, majority
@@ -22,6 +22,7 @@ from .tracker import IouTracker
 from .tracks import TrackStatus
 
 __all__ = [
+    "ClassicalEntityFuser",
     "ClassicalEventDetector",
     "EventDetector",
     "EventKind",

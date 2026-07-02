@@ -19,6 +19,7 @@ from .frames import Frame
 from .ports import (
     Calibrator,
     EntityEnricher,
+    EntityFuser,
     EventSource,
     FrameSource,
     HudReader,
@@ -61,6 +62,7 @@ class PerceptionPipeline:
         minimap_reader: MinimapReader | None = None,
         tracker: Tracker | None = None,
         enricher: EntityEnricher | None = None,
+        fuser: EntityFuser | None = None,
         event_detector: EventSource | None = None,
         sink: WorldModelSink | None = None,
         profiler: StageProfiler | None = None,
@@ -75,6 +77,7 @@ class PerceptionPipeline:
         self._minimap_reader = minimap_reader
         self._tracker = tracker
         self._enricher = enricher
+        self._fuser = fuser
         self._event_detector = event_detector
         self._sink = sink
         self._profiler = profiler
@@ -158,6 +161,10 @@ class PerceptionPipeline:
         if self._enricher is not None:
             with self._stage("enrich"):
                 entities = self._enricher.enrich(entities, frame)
+
+        if self._fuser is not None and minimap is not None:
+            with self._stage("fuse"):
+                entities = self._fuser.fuse(entities, minimap)
 
         if self._event_detector is not None:
             with self._stage("events"):

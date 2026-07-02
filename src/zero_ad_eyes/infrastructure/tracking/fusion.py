@@ -17,10 +17,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from zero_ad_eyes.application.settings import GeometrySettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import WorldPoint
-from zero_ad_eyes.domain.taxonomy import Ownership
+from zero_ad_eyes.domain.minimap import MinimapModel, ViewportRect
+from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership
 from zero_ad_eyes.infrastructure.geometry.fusion import reconcile
 
 
@@ -142,3 +144,69 @@ def fuse_entities(
             consumed.add(best_idx)
 
     return tuple(merged)
+
+
+def _inside_viewport(point: WorldPoint, viewport: ViewportRect) -> bool:
+    """Whether a world point falls within the camera viewport rect (order-agnostic)."""
+
+    x_lo, x_hi = sorted((viewport.top_left.x, viewport.bottom_right.x))
+    y_lo, y_hi = sorted((viewport.top_left.y, viewport.bottom_right.y))
+    return x_lo <= point.x <= x_hi and y_lo <= point.y <= y_hi
+
+
+class ClassicalEntityFuser:
+    """``EntityFuser`` adapter (G4/G5): folds minimap blips into the entity set.
+
+    The tracked entities and the minimap blips do not yet share a coordinate frame —
+    tracker entities carry a *screen* bbox while blips carry a *world* position, and
+    the offline path has no screen→world projector (F1) to bridge them. So this adapter
+    does the half of G4 that IS well-defined today: it surfaces the blips that lie
+    **outside the camera viewport** — units the main view cannot see — as their own
+    world-space entities, and deliberately drops in-viewport blips (which would be
+    double-counts of on-screen tracked entities it cannot yet merge with). It still
+    routes everything through :func:`fuse_entities` with ``cfg.geometry`` (match_radius,
+    agreement_scale), so once entities gain world positions (F1 wired) the positional
+    match-and-merge activates with no change here. When the viewport is unknown it emits
+    no hints, rather than risk double-counting.
+    """
+
+    def __init__(self, *, match_radius: float, agreement_scale: float) -> None:
+        self._match_radius = match_radius
+        self._agreement_scale = agreement_scale
+
+    @classmethod
+    def from_settings(cls, geometry: GeometrySettings) -> ClassicalEntityFuser:
+        """Build from the ``geometry`` config (Approach B boundary mapping)."""
+
+        return cls(
+            match_radius=geometry.fusion_match_radius,
+            agreement_scale=geometry.fusion_agreement_scale,
+        )
+
+    def fuse(self, entities: Sequence[Entity], minimap: MinimapModel) -> tuple[Entity, ...]:
+        hints = self._blip_hints(entities, minimap)
+        return fuse_entities(
+            entities,
+            hints,
+            match_radius=self._match_radius,
+            agreement_scale=self._agreement_scale,
+        )
+
+    def _blip_hints(self, entities: Sequence[Entity], minimap: MinimapModel) -> tuple[Entity, ...]:
+        if minimap.viewport is None:
+            return ()  # no viewport → cannot tell on- from off-screen; emit nothing
+        base = max((e.entity_id for e in entities), default=-1) + 1
+        hints: list[Entity] = []
+        for offset, blip in enumerate(minimap.blips):
+            if _inside_viewport(blip.world_pos, minimap.viewport):
+                continue  # on-screen: already tracked from the main view; skip (no double-count)
+            hints.append(
+                Entity(
+                    entity_id=base + offset,
+                    kind=EntityKind.OTHER,  # a blip is a coloured dot: coarse class unknown
+                    ownership=blip.ownership,
+                    world_pos=blip.world_pos,
+                    confidence=blip.confidence,
+                )
+            )
+        return tuple(hints)

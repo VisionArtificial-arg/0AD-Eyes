@@ -39,3 +39,16 @@ def test_config_threads_live_capture_knobs_into_source() -> None:
 
     # Built from config, not in-code defaults: the pacer runs at the configured fps.
     assert source._pacer._interval == 1.0 / 12.0
+
+
+def test_build_live_pipeline_wires_live_source_and_fuser() -> None:
+    # The live composition root builds the classical chain over a screen-capture source
+    # (constructed, not run — no display needed). mss is imported lazily on first grab.
+    from zero_ad_eyes.application.pipeline import PerceptionPipeline
+    from zero_ad_eyes.interface.cli import _build_live_pipeline
+
+    pipeline = _build_live_pipeline(config=default_config(), max_frames=2)
+
+    assert isinstance(pipeline, PerceptionPipeline)
+    assert isinstance(pipeline._source, ScreenCaptureSource)
+    assert pipeline._fuser is not None

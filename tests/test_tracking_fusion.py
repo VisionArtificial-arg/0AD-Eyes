@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from zero_ad_eyes.application.settings import GeometrySettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import WorldPoint
+from zero_ad_eyes.domain.minimap import Blip, MinimapModel, ViewportRect
 from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership
-from zero_ad_eyes.infrastructure.tracking import fuse_entities, resolve_conflict
+from zero_ad_eyes.infrastructure.tracking import (
+    ClassicalEntityFuser,
+    fuse_entities,
+    resolve_conflict,
+)
 
 
 def _entity(
@@ -100,3 +106,61 @@ def test_fuse_matches_each_primary_at_most_once() -> None:
     # one hint merges into primary 0; the second has no free primary → appended
     assert len(fused) == 2
     assert {e.entity_id for e in fused} == {0, 11}
+
+
+# --- ClassicalEntityFuser: minimap blips folded into the entity set (G4/G5) -------
+
+
+def _blip(
+    x: float, y: float, *, ownership: Ownership = Ownership.ENEMY, value: float = 0.8
+) -> Blip:
+    return Blip(
+        world_pos=WorldPoint(x=x, y=y),
+        ownership=ownership,
+        confidence=Confidence(value=value, provenance=Provenance.CLASSICAL),
+    )
+
+
+def _viewport(x0: float, y0: float, x1: float, y1: float) -> ViewportRect:
+    return ViewportRect(top_left=WorldPoint(x=x0, y=y0), bottom_right=WorldPoint(x=x1, y=y1))
+
+
+_FUSER = ClassicalEntityFuser(match_radius=20.0, agreement_scale=1.0)
+
+
+def test_fuser_surfaces_off_viewport_blip_as_world_entity() -> None:
+    entities = (_entity(0, x=0.0, y=0.0, value=0.5),)
+    minimap = MinimapModel(blips=(_blip(500.0, 500.0),), viewport=_viewport(0.0, 0.0, 100.0, 100.0))
+
+    fused = _FUSER.fuse(entities, minimap)
+
+    extra = [e for e in fused if e.entity_id != 0]
+    assert len(extra) == 1
+    assert extra[0].world_pos == WorldPoint(x=500.0, y=500.0)
+    assert extra[0].ownership is Ownership.ENEMY
+    assert extra[0].entity_id != 0  # fresh id, no collision with the tracked entity
+
+
+def test_fuser_skips_in_viewport_blip_to_avoid_double_count() -> None:
+    entities = (_entity(0, x=0.0, y=0.0),)
+    minimap = MinimapModel(blips=(_blip(50.0, 50.0),), viewport=_viewport(0.0, 0.0, 100.0, 100.0))
+
+    # The blip is on-screen (inside the viewport); without a screen→world projector we
+    # cannot merge it with the tracked entity, so it is dropped rather than duplicated.
+    assert _FUSER.fuse(entities, minimap) == entities
+
+
+def test_fuser_without_viewport_emits_no_hints() -> None:
+    entities = (_entity(0),)
+    minimap = MinimapModel(blips=(_blip(500.0, 500.0),), viewport=None)
+    assert _FUSER.fuse(entities, minimap) == entities
+
+
+def test_fuser_from_settings_reads_geometry() -> None:
+    fuser = ClassicalEntityFuser.from_settings(
+        GeometrySettings(
+            camera_error_tolerance=1.0, fusion_agreement_scale=2.0, fusion_match_radius=15.0
+        )
+    )
+    assert fuser._match_radius == 15.0
+    assert fuser._agreement_scale == 2.0

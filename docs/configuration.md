@@ -163,12 +163,16 @@ save_config(default_config(), "my.json")  # then delete everything you don't wan
 
 - **Structural constants stay in code** (epsilons, the hue-179 OpenCV ceiling,
   minimum-size guards) — they are correctness invariants, not tuning knobs.
-- A few sections are **config-complete but have no runtime consumer in the offline path
-  yet**: the live-capture knobs (`acquisition.live_*`, consumed by
-  `ScreenCaptureSource.from_settings` — used once a live run path exists) and the
-  `geometry` section (threaded as required params into `CameraProjector` / `reconcile` /
-  `fuse_entities`, but no pipeline stage calls them yet). Their values already live here
-  and in the generator — there are no in-code defaults — so wiring the consumer is the
-  only remaining step. The deep calibration anchor/agreement constants remain structural.
+- **Live capture** (`acquisition.live_*`) drives `zero-ad-eyes run --live`, which builds a
+  `ScreenCaptureSource.from_settings(cfg.acquisition)` into the same classical chain as
+  `--recording` (needs a display + the `mss` backend to actually grab; `--frames` bounds it).
+- **Geometry / fusion** (`geometry.*`) drives the fusion stage (G4/G5): the pipeline folds
+  minimap blips into the tracked entity set via `ClassicalEntityFuser.from_settings(cfg.geometry)`.
+  Today it surfaces blips **outside the camera viewport** as their own world-space entities and
+  drops in-viewport ones (which would double-count on-screen tracked entities). Full
+  screen↔world merge of an on-screen blip with its tracked entity awaits the F1 camera
+  projector (no screen→world correspondences exist offline yet); the stage already routes
+  through `fuse_entities` with `cfg.geometry`, so that merge activates unchanged once entities
+  carry world positions. The deep calibration anchor/agreement constants remain structural.
 - The offline pipeline applies **no preprocessing by default**; `preprocessing`
   parameterises the HUD/scene chain factories for when a chain is enabled.
