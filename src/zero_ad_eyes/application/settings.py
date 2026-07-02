@@ -362,6 +362,21 @@ class HudSettings(BaseModel):
     ocr_config: str = "--psm 7"  # Tesseract page-segmentation mode (single line)
 
 
+class TrackingSettings(BaseModel):
+    """Classical tracking + event-detection tuning (EPIC G), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # IoU tracker (G1–G3)
+    iou_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    min_hits: int = Field(default=1, ge=0)  # hits before a track is CONFIRMED
+    max_staleness: int = Field(default=15, ge=0)  # memory budget before DEAD (G3)
+    decay: float = Field(default=0.85, ge=0.0, le=1.0)  # per-miss confidence decay
+    # Event detection (G8)
+    combat_drop: float = Field(default=0.05, ge=0.0, le=1.0)  # health drop ⇒ combat event
+    depletion_health: float = Field(default=0.02, ge=0.0, le=1.0)  # health ≤ this ⇒ depleted
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -382,3 +397,4 @@ class Config(BaseModel):
     perception: PerceptionSettings = Field(default_factory=PerceptionSettings)
     minimap: MinimapSettings = Field(default_factory=MinimapSettings)
     hud: HudSettings = Field(default_factory=HudSettings)
+    tracking: TrackingSettings = Field(default_factory=TrackingSettings)

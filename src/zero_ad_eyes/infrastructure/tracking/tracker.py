@@ -16,6 +16,7 @@ out. Motion (G6), stabilisation (G7) and events (G8) extend this same adapter.
 from __future__ import annotations
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import TrackingSettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.detections import Detection, Detections
 from zero_ad_eyes.domain.entities import Entity
@@ -43,6 +44,17 @@ class IouTracker:
         self._decay = decay
         self._tracks: list[Track] = []
         self._next_id = 0
+
+    @classmethod
+    def from_settings(cls, settings: TrackingSettings) -> IouTracker:
+        """Build from pure config (Approach B boundary mapping)."""
+
+        return cls(
+            iou_threshold=settings.iou_threshold,
+            min_hits=settings.min_hits,
+            max_staleness=settings.max_staleness,
+            decay=settings.decay,
+        )
 
     def update(self, detections: Detections, frame: Frame) -> tuple[Entity, ...]:
         """Associate this frame's detections, age the misses, emit live entities."""

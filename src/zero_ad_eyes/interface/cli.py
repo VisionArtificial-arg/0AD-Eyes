@@ -84,9 +84,9 @@ def _build_offline_pipeline(
         self_check=LayoutSelfCheck(),
         hud_reader=ClassicalHudReader.from_settings(cfg.hud),
         minimap_reader=ClassicalMinimapReader.from_settings(cfg.minimap),
-        tracker=IouTracker(),
+        tracker=IouTracker.from_settings(cfg.tracking),
         enricher=ClassicalEntityEnricher.from_settings(cfg.perception),
-        event_detector=ClassicalEventDetector(),
+        event_detector=ClassicalEventDetector.from_settings(cfg.tracking),
         profiler=profiler,
     )
 

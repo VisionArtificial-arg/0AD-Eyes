@@ -23,6 +23,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.application.settings import TrackingSettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.events import Event
@@ -58,6 +59,15 @@ class EventDetector:
         self._combat_drop = combat_drop
         self._depletion_health = depletion_health
         self._previous: dict[int, Entity] = {}
+
+    @classmethod
+    def from_settings(cls, settings: TrackingSettings) -> EventDetector:
+        """Build from pure config (Approach B boundary mapping)."""
+
+        return cls(
+            combat_drop=settings.combat_drop,
+            depletion_health=settings.depletion_health,
+        )
 
     def detect(self, entities: Sequence[Entity], frame_id: int) -> tuple[TrackingEvent, ...]:
         """Diff this frame's entities against the last, returning ordered events."""
@@ -143,6 +153,12 @@ class ClassicalEventDetector:
 
     def __init__(self, detector: EventDetector | None = None) -> None:
         self._detector = detector if detector is not None else EventDetector()
+
+    @classmethod
+    def from_settings(cls, settings: TrackingSettings) -> ClassicalEventDetector:
+        """Build from pure config (Approach B boundary mapping)."""
+
+        return cls(EventDetector.from_settings(settings))
 
     def detect(self, entities: Sequence[Entity], frame_id: int) -> tuple[Event, ...]:
         by_id = {entity.entity_id: entity for entity in entities}
