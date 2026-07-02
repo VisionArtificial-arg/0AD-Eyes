@@ -31,6 +31,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.application.settings import Thresholds
 from zero_ad_eyes.domain.detections import Detection, Detections
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.geometry import ScreenBBox
@@ -133,7 +134,13 @@ class EvaluationReport(BaseModel):
 
 
 class EvalConfig(BaseModel):
-    """NF3 thresholds and matching parameters (config-driven, NF7)."""
+    """NF3 thresholds and matching parameters (config-driven, NF7).
+
+    The canonical home for the NF3 targets is ``application.settings.Thresholds``;
+    :meth:`from_thresholds` derives this harness-facing view from it so the two never
+    drift. The defaults here mirror those targets for callers that score without a
+    loaded config.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -142,6 +149,18 @@ class EvalConfig(BaseModel):
     ownership_accuracy_min: float = 0.98
     tracking_mota_min: float = 0.70
     iou_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+
+    @classmethod
+    def from_thresholds(cls, thresholds: Thresholds) -> EvalConfig:
+        """Derive the harness config from the single-home NF3 targets (settings)."""
+
+        return cls(
+            hud_error_max=thresholds.hud_read_max_error,
+            detection_map_min=thresholds.detection_map_target,
+            ownership_accuracy_min=thresholds.ownership_accuracy_target,
+            tracking_mota_min=thresholds.tracking_mota_target,
+            iou_threshold=thresholds.eval_iou_threshold,
+        )
 
 
 # --------------------------------------------------------------------------- #

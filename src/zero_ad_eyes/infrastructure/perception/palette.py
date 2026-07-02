@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.application.settings import OwnershipPalette
 from zero_ad_eyes.domain.taxonomy import Ownership
 
 
@@ -68,31 +69,39 @@ class PlayerPalette(BaseModel):
 
     colors: tuple[PlayerColor, ...]
 
+    @classmethod
+    def from_settings(cls, palette: OwnershipPalette) -> PlayerPalette:
+        """Build the cv2-backed palette from its pure-data config (Approach B).
+
+        The config (``application.settings``) owns the values; this boundary mapping
+        rehydrates them into the OpenCV-capable infra types. Field-for-field, so a
+        default config yields exactly the historical ``DEFAULT_PALETTE``.
+        """
+
+        return cls(
+            colors=tuple(
+                PlayerColor(
+                    name=color.name,
+                    ownership=color.ownership,
+                    bands=tuple(
+                        HsvBand(
+                            h_lo=band.h_lo,
+                            h_hi=band.h_hi,
+                            s_lo=band.s_lo,
+                            s_hi=band.s_hi,
+                            v_lo=band.v_lo,
+                            v_hi=band.v_hi,
+                        )
+                        for band in color.bands
+                    ),
+                )
+                for color in palette.colors
+            )
+        )
+
 
 # Default relative palette. SELF=blue, ALLY=green, ENEMY=red (hue-wrapped),
-# GAIA=yellow. Deliberately conservative saturation/value floors so weakly
-# tinted terrain does not register as a player colour.
-DEFAULT_PALETTE = PlayerPalette(
-    colors=(
-        PlayerColor(
-            name="blue",
-            ownership=Ownership.SELF,
-            bands=(HsvBand(h_lo=100, h_hi=130),),
-        ),
-        PlayerColor(
-            name="green",
-            ownership=Ownership.ALLY,
-            bands=(HsvBand(h_lo=45, h_hi=85),),
-        ),
-        PlayerColor(
-            name="red",
-            ownership=Ownership.ENEMY,
-            bands=(HsvBand(h_lo=0, h_hi=10), HsvBand(h_lo=170, h_hi=179)),
-        ),
-        PlayerColor(
-            name="yellow",
-            ownership=Ownership.GAIA,
-            bands=(HsvBand(h_lo=22, h_hi=34),),
-        ),
-    ),
-)
+# GAIA=yellow. Deliberately conservative saturation/value floors so weakly tinted
+# terrain does not register as a player colour. Derived from the config default
+# (application.settings.OwnershipPalette) so there is a single source of truth.
+DEFAULT_PALETTE = PlayerPalette.from_settings(OwnershipPalette())

@@ -93,7 +93,12 @@ class OverlaySettings(BaseModel):
 
 
 class Thresholds(BaseModel):
-    """Perception thresholds and the NF3 accuracy targets, in one place (NF7)."""
+    """Perception thresholds and the NF3 accuracy targets, in one place (NF7).
+
+    This is the single home for the NF3 targets (the ML8 ``EvalConfig`` derives from
+    it via ``EvalConfig.from_thresholds``), so the file-driven config and the eval
+    harness cannot drift apart.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -102,6 +107,80 @@ class Thresholds(BaseModel):
     hud_read_max_error: float = Field(default=0.01, ge=0.0, le=1.0)  # NF3 <1%
     detection_map_target: float = Field(default=0.80, ge=0.0, le=1.0)  # NF3
     ownership_accuracy_target: float = Field(default=0.98, ge=0.0, le=1.0)  # NF3
+    tracking_mota_target: float = Field(default=0.70, ge=0.0, le=1.0)  # NF3
+    eval_iou_threshold: float = Field(default=0.5, ge=0.0, le=1.0)  # ML8 box-match IoU
+
+
+# --------------------------------------------------------------------------- #
+# Perception tuning — pure DATA (Approach B): the ownership palette lives here  #
+# as codec-free value objects; infrastructure builds its cv2-backed            #
+# ``PlayerPalette`` from this at the boundary (see perception/palette.py).      #
+# --------------------------------------------------------------------------- #
+
+
+class OwnershipHsvBand(BaseModel):
+    """An inclusive HSV window (OpenCV ranges: H 0-179, S/V 0-255) — pure data."""
+
+    model_config = ConfigDict(frozen=True)
+
+    h_lo: int = Field(ge=0, le=179)
+    h_hi: int = Field(ge=0, le=179)
+    s_lo: int = Field(default=70, ge=0, le=255)
+    s_hi: int = Field(default=255, ge=0, le=255)
+    v_lo: int = Field(default=50, ge=0, le=255)
+    v_hi: int = Field(default=255, ge=0, le=255)
+
+
+class OwnershipColor(BaseModel):
+    """A player colour mapped to an ownership relation and its HSV bands."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    ownership: Ownership
+    bands: tuple[OwnershipHsvBand, ...]
+
+
+def _default_ownership_colors() -> tuple[OwnershipColor, ...]:
+    """The default relative palette (SELF=blue, ALLY=green, ENEMY=red, GAIA=yellow).
+
+    Values mirror the former infra ``DEFAULT_PALETTE`` exactly, so externalizing it
+    changes no behaviour; the config is now the single source and infra derives it.
+    """
+
+    return (
+        OwnershipColor(
+            name="blue", ownership=Ownership.SELF, bands=(OwnershipHsvBand(h_lo=100, h_hi=130),)
+        ),
+        OwnershipColor(
+            name="green", ownership=Ownership.ALLY, bands=(OwnershipHsvBand(h_lo=45, h_hi=85),)
+        ),
+        OwnershipColor(
+            name="red",
+            ownership=Ownership.ENEMY,
+            bands=(OwnershipHsvBand(h_lo=0, h_hi=10), OwnershipHsvBand(h_lo=170, h_hi=179)),
+        ),
+        OwnershipColor(
+            name="yellow", ownership=Ownership.GAIA, bands=(OwnershipHsvBand(h_lo=22, h_hi=34),)
+        ),
+    )
+
+
+class OwnershipPalette(BaseModel):
+    """The set of player colours in play, ordered by matching priority (E3)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    colors: tuple[OwnershipColor, ...] = Field(default_factory=_default_ownership_colors)
+
+
+class PerceptionSettings(BaseModel):
+    """Classical perception tuning (E3 ownership), config-driven (NF7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    ownership_palette: OwnershipPalette = Field(default_factory=OwnershipPalette)
+    ownership_min_fraction: float = Field(default=0.02, ge=0.0, le=1.0)
 
 
 class Paths(BaseModel):
@@ -121,3 +200,4 @@ class Config(BaseModel):
     thresholds: Thresholds = Field(default_factory=Thresholds)
     paths: Paths = Field(default_factory=Paths)
     overlay: OverlaySettings = Field(default_factory=OverlaySettings)
+    perception: PerceptionSettings = Field(default_factory=PerceptionSettings)

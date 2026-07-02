@@ -22,16 +22,36 @@ from collections.abc import Sequence
 from typing import Any
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import PerceptionSettings
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.taxonomy import Ownership
 
 from .health import read_health
 from .ownership import assign_ownership
+from .palette import DEFAULT_PALETTE, PlayerPalette
 from .state import read_state_cues
 
 
 class ClassicalEntityEnricher:
     """Fill ownership/health/selection onto tracked entities from pixels."""
+
+    def __init__(
+        self,
+        *,
+        ownership_palette: PlayerPalette | None = None,
+        ownership_min_fraction: float = 0.02,
+    ) -> None:
+        self._ownership_palette = ownership_palette or DEFAULT_PALETTE
+        self._ownership_min_fraction = ownership_min_fraction
+
+    @classmethod
+    def from_settings(cls, settings: PerceptionSettings) -> ClassicalEntityEnricher:
+        """Construct from pure config (Approach B): build the cv2 palette at the boundary."""
+
+        return cls(
+            ownership_palette=PlayerPalette.from_settings(settings.ownership_palette),
+            ownership_min_fraction=settings.ownership_min_fraction,
+        )
 
     def enrich(self, entities: Sequence[Entity], frame: Frame) -> tuple[Entity, ...]:
         return tuple(self._enrich_one(entity, frame) for entity in entities)
@@ -44,7 +64,9 @@ class ClassicalEntityEnricher:
         update: dict[str, Any] = {}
 
         if entity.ownership is Ownership.UNKNOWN:
-            owner, _coverage = assign_ownership(frame, bbox)
+            owner, _coverage = assign_ownership(
+                frame, bbox, self._ownership_palette, self._ownership_min_fraction
+            )
             if owner is not Ownership.UNKNOWN:
                 update["ownership"] = owner
 

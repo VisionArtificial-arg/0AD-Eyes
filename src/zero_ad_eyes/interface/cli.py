@@ -15,7 +15,15 @@ from pathlib import Path
 
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
 from zero_ad_eyes.application.ports import FrameSource, PerceptionModel, StageProfiler
+from zero_ad_eyes.application.settings import Config
+from zero_ad_eyes.infrastructure.config.config import load_config
 from zero_ad_eyes.infrastructure.model.stub_adapter import StubPerceptionModel
+
+
+def _load_config(path: str | None) -> Config:
+    """Load the typed config from ``path`` (defaults + JSON + env), or pure defaults."""
+
+    return load_config(path)
 
 
 def _offline_source(recording: str) -> FrameSource:
@@ -40,7 +48,11 @@ def _perception_model(detector: str) -> PerceptionModel:
 
 
 def _build_offline_pipeline(
-    recording: str, *, detector: str = "classical", profiler: StageProfiler | None = None
+    recording: str,
+    *,
+    detector: str = "classical",
+    profiler: StageProfiler | None = None,
+    config: Config | None = None,
 ) -> PerceptionPipeline:
     """Wire the real classical chain over a recording (EPIC A→G integration).
 
@@ -49,6 +61,10 @@ def _build_offline_pipeline(
     the classical detection baseline (E6a/E11) — the v1 default. ``--detector stub``
     swaps in the empty stub for plumbing-only runs; a learned adapter (MP4) would
     swap in here identically.
+
+    This is the composition root where config is read (NF7): each adapter is built
+    ``from_settings`` of the typed :class:`Config` (defaults when none supplied), so
+    the pipeline itself stays config-free — it only ever sees ports.
     """
 
     from zero_ad_eyes.infrastructure.calibration import HudCalibrator, LayoutSelfCheck
@@ -57,6 +73,8 @@ def _build_offline_pipeline(
     from zero_ad_eyes.infrastructure.perception import ClassicalEntityEnricher
     from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector, IouTracker
+
+    cfg = config or Config()
 
     return PerceptionPipeline(
         _offline_source(recording),
@@ -67,7 +85,7 @@ def _build_offline_pipeline(
         hud_reader=ClassicalHudReader(),
         minimap_reader=ClassicalMinimapReader(),
         tracker=IouTracker(),
-        enricher=ClassicalEntityEnricher(),
+        enricher=ClassicalEntityEnricher.from_settings(cfg.perception),
         event_detector=ClassicalEventDetector(),
         profiler=profiler,
     )
@@ -108,16 +126,90 @@ def _format_metric(metric: object) -> str:
     return f"  {metric.name}: {metric.value:.4f} [{verdict}]{threshold}"
 
 
-def _run_eval(dataset: str | None) -> int:
-    """ML8 accuracy gate. Honest by construction: with no ground-truth dataset it
-    reports the classical metrics as unmeasured and detection mAP as pending-model,
-    rather than scoring empty inputs. With a dataset it runs the real harness and
-    exits non-zero only on a measured failure."""
+def _print_report(report: object) -> int:
+    from zero_ad_eyes.infrastructure.data import EvaluationReport
 
-    from zero_ad_eyes.infrastructure.data import evaluate
+    assert isinstance(report, EvaluationReport)
+    for metric in report.metrics:
+        print(_format_metric(metric))
+    verdict = report.passed
+    print(f"eval: {'PENDING' if verdict is None else ('PASS' if verdict else 'FAIL')}")
+    return 1 if verdict is False else 0
+
+
+def _eval_from_recording(
+    recording: str,
+    engine_export: str,
+    *,
+    detector: str,
+    align_by: str,
+    time_tolerance: float,
+    config: Config,
+) -> int:
+    """Run the classical chain over a recording and score it against an engine export.
+
+    This is the offline accuracy loop end-to-end: the pipeline produces predicted
+    world models from pixels, the engine export (ML2/D6) provides ground truth, and
+    the harness aligns and scores the classical NF3 metrics. Detection mAP stays
+    pending-model until the learned adapter (MP4) lands.
+    """
+
+    from zero_ad_eyes.infrastructure.data import (
+        AlignBy,
+        EngineStateExport,
+        EvalConfig,
+        evaluate_against_engine,
+    )
+
+    pipeline = _build_offline_pipeline(recording, detector=detector, config=config)
+    predicted = list(pipeline.run())
+    export = EngineStateExport.load(Path(engine_export))
+    report = evaluate_against_engine(
+        predicted,
+        export,
+        align_by=AlignBy(align_by),
+        time_tolerance=time_tolerance,
+        config=EvalConfig.from_thresholds(config.thresholds),
+    )
+    return _print_report(report)
+
+
+def _run_eval(
+    *,
+    dataset: str | None,
+    recording: str | None,
+    engine_export: str | None,
+    detector: str,
+    align_by: str,
+    time_tolerance: float,
+    config: Config,
+) -> int:
+    """ML8 accuracy gate. Honest by construction: with no ground truth it reports the
+    classical metrics as unmeasured and detection mAP as pending-model, rather than
+    scoring empty inputs. Two ground-truth sources are supported: a pre-serialized
+    ``--dataset`` of ``{predicted, truth}`` world models, or a live ``--recording``
+    scored against an ``--engine-export`` (the full offline loop). NF3 targets come
+    from the loaded config (NF7). Either way it exits non-zero only on a *measured*
+    failure."""
+
+    from zero_ad_eyes.infrastructure.data import EvalConfig, evaluate
+
+    if recording is not None or engine_export is not None:
+        if recording is None or engine_export is None:
+            print("eval: --recording and --engine-export must be supplied together")
+            return 2
+        return _eval_from_recording(
+            recording,
+            engine_export,
+            detector=detector,
+            align_by=align_by,
+            time_tolerance=time_tolerance,
+            config=config,
+        )
 
     if not dataset or not Path(dataset).exists():
         print("eval: no ground-truth dataset supplied (pass --dataset PATH once recordings exist)")
+        print("  or score a recording directly: --recording PATH --engine-export PATH")
         print("  detection_map: pending-model (needs the trained model, MP4)")
         print("  hud_read_error / ownership_accuracy / tracking_mota: unmeasured (no ground truth)")
         return 0
@@ -127,12 +219,8 @@ def _run_eval(dataset: str | None) -> int:
 
     predicted = [WorldModel.model_validate(item) for item in raw.get("predicted", [])]
     truth = [WorldModel.model_validate(item) for item in raw.get("truth", [])]
-    report = evaluate(predicted, truth)
-    for metric in report.metrics:
-        print(_format_metric(metric))
-    verdict = report.passed
-    print(f"eval: {'PENDING' if verdict is None else ('PASS' if verdict else 'FAIL')}")
-    return 1 if verdict is False else 0
+    report = evaluate(predicted, truth, config=EvalConfig.from_thresholds(config.thresholds))
+    return _print_report(report)
 
 
 def _run_bench(
@@ -143,6 +231,7 @@ def _run_bench(
     width: int,
     height: int,
     warmup: int,
+    config: Config,
 ) -> int:
     """T6 perf harness. Honest like eval: on the stub/classical path the latency is
     provisional (the learned inference that dominates NF1 is absent), so it reports
@@ -152,7 +241,9 @@ def _run_bench(
 
     timings = StageTimings()
     if recording is not None:
-        pipeline = _build_offline_pipeline(recording, detector=detector, profiler=timings)
+        pipeline = _build_offline_pipeline(
+            recording, detector=detector, profiler=timings, config=config
+        )
     else:
         source = _synthetic_source(frames, width, height)
         pipeline = PerceptionPipeline(source, StubPerceptionModel(), profiler=timings)  # type: ignore[arg-type]
@@ -200,9 +291,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="classical",
         help="detection model behind the seam (v1 default: classical; stub = plumbing only)",
     )
+    run.add_argument(
+        "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
+    )
 
     ev = sub.add_parser("eval", help="run the ML8 accuracy harness (NF3 metrics)")
     ev.add_argument("--dataset", default=None, help="JSON with {predicted, truth} world models")
+    ev.add_argument(
+        "--recording",
+        default=None,
+        help="score a recording (image folder or video) end-to-end; needs --engine-export",
+    )
+    ev.add_argument(
+        "--engine-export",
+        default=None,
+        help="engine ground-truth JSON (ML2/D6) to score the --recording against",
+    )
+    ev.add_argument(
+        "--detector",
+        choices=("classical", "stub"),
+        default="classical",
+        help="detection model behind the seam for --recording (default: classical)",
+    )
+    ev.add_argument(
+        "--align-by",
+        choices=("frame_id", "timestamp"),
+        default="frame_id",
+        help="pair predicted frames to engine frames by exact id or nearest timestamp (R5)",
+    )
+    ev.add_argument(
+        "--time-tolerance",
+        type=float,
+        default=0.0,
+        help="max seconds between paired frames when --align-by timestamp",
+    )
+    ev.add_argument(
+        "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
+    )
 
     bench = sub.add_parser("bench", help="benchmark latency + throughput (T6/NF1/NF2)")
     bench.add_argument("--frames", type=int, default=100)
@@ -213,12 +338,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--recording", default=None, help="benchmark the real classical chain over a recording"
     )
     bench.add_argument("--detector", choices=("classical", "stub"), default="classical")
+    bench.add_argument(
+        "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
+    )
 
     args = parser.parse_args(argv)
 
     if args.command == "run":
+        config = _load_config(args.config)
         if args.recording is not None:
-            pipeline = _build_offline_pipeline(args.recording, detector=args.detector)
+            pipeline = _build_offline_pipeline(
+                args.recording, detector=args.detector, config=config
+            )
         else:
             source = _synthetic_source(args.frames, args.width, args.height)
             model = _perception_model(args.detector)
@@ -228,7 +359,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "eval":
-        return _run_eval(args.dataset)
+        return _run_eval(
+            dataset=args.dataset,
+            recording=args.recording,
+            engine_export=args.engine_export,
+            detector=args.detector,
+            align_by=args.align_by,
+            time_tolerance=args.time_tolerance,
+            config=_load_config(args.config),
+        )
 
     if args.command == "bench":
         return _run_bench(
@@ -238,6 +377,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             width=args.width,
             height=args.height,
             warmup=args.warmup,
+            config=_load_config(args.config),
         )
 
     parser.error(f"unknown command: {args.command}")
