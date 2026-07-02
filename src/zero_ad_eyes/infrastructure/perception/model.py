@@ -17,10 +17,16 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import PerceptionSettings
 from zero_ad_eyes.domain.detections import Detection, Detections
 from zero_ad_eyes.domain.geometry import ScreenBBox
 
-from .resources import DEFAULT_RESOURCE_CUES, ResourceCue, detect_resource_nodes
+from .resources import (
+    DEFAULT_RESOURCE_CUES,
+    ResourceCue,
+    detect_resource_nodes,
+    resource_cues_from_settings,
+)
 from .templates import Template, TemplateBank
 
 
@@ -38,6 +44,15 @@ class ClassicalPerceptionModel:
         self._resource_cues = tuple(resource_cues)
         self._resource_templates = tuple(resource_templates)
         self._detect_resources = detect_resources
+
+    @classmethod
+    def from_settings(cls, settings: PerceptionSettings) -> ClassicalPerceptionModel:
+        """Build from pure config (Approach B): resource cues + the detection toggle."""
+
+        return cls(
+            resource_cues=resource_cues_from_settings(settings.resource_cues),
+            detect_resources=settings.detect_resources,
+        )
 
     def infer(self, frame: Frame, roi: ScreenBBox | None = None) -> Detections:
         """Run the classical detectors over ``frame`` and package their detections."""

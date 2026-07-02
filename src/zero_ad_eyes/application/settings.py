@@ -174,13 +174,70 @@ class OwnershipPalette(BaseModel):
     colors: tuple[OwnershipColor, ...] = Field(default_factory=_default_ownership_colors)
 
 
+class HsvWindow(BaseModel):
+    """A generic inclusive HSV window (OpenCV ranges: H 0-179, S/V 0-255).
+
+    Same shape as :class:`OwnershipHsvBand`; kept distinct for now, to be unified
+    into a single HSV-window type in the P4 dedup pass.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    h_lo: int = Field(ge=0, le=179)
+    h_hi: int = Field(ge=0, le=179)
+    s_lo: int = Field(default=70, ge=0, le=255)
+    s_hi: int = Field(default=255, ge=0, le=255)
+    v_lo: int = Field(default=50, ge=0, le=255)
+    v_hi: int = Field(default=255, ge=0, le=255)
+
+
+class ResourceCueSetting(BaseModel):
+    """A coarse colour signature for one class of natural resource node (E6a)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    entity_type: str
+    bands: tuple[HsvWindow, ...]
+    min_area: int = Field(default=20, ge=0)
+
+
+def _default_resource_cues() -> tuple[ResourceCueSetting, ...]:
+    """Coarse, overlap-tolerant signatures (recall over precision).
+
+    Mirrors the former infra ``DEFAULT_RESOURCE_CUES`` exactly.
+    """
+
+    return (
+        ResourceCueSetting(
+            entity_type="tree", bands=(HsvWindow(h_lo=35, h_hi=85, s_lo=40, v_lo=30),)
+        ),
+        ResourceCueSetting(
+            entity_type="mine",
+            bands=(HsvWindow(h_lo=0, h_hi=179, s_lo=0, s_hi=50, v_lo=50, v_hi=190),),
+        ),
+        ResourceCueSetting(
+            entity_type="bush",
+            bands=(
+                HsvWindow(h_lo=0, h_hi=8, s_lo=90, v_lo=60),
+                HsvWindow(h_lo=168, h_hi=179, s_lo=90, v_lo=60),
+            ),
+        ),
+        ResourceCueSetting(
+            entity_type="fauna",
+            bands=(HsvWindow(h_lo=9, h_hi=25, s_lo=60, s_hi=200, v_lo=40, v_hi=190),),
+        ),
+    )
+
+
 class PerceptionSettings(BaseModel):
-    """Classical perception tuning (E3 ownership), config-driven (NF7)."""
+    """Classical perception tuning (E3 ownership, E6a resources), config-driven (NF7)."""
 
     model_config = ConfigDict(frozen=True)
 
     ownership_palette: OwnershipPalette = Field(default_factory=OwnershipPalette)
     ownership_min_fraction: float = Field(default=0.02, ge=0.0, le=1.0)
+    detect_resources: bool = True
+    resource_cues: tuple[ResourceCueSetting, ...] = Field(default_factory=_default_resource_cues)
 
 
 # --------------------------------------------------------------------------- #

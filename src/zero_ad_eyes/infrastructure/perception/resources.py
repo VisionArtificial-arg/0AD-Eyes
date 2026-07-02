@@ -19,6 +19,7 @@ import cv2
 import numpy as np
 
 from zero_ad_eyes.application.frames import Frame
+from zero_ad_eyes.application.settings import PerceptionSettings, ResourceCueSetting
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.detections import Detection
 from zero_ad_eyes.domain.geometry import ScreenBBox, ScreenPoint
@@ -37,19 +38,29 @@ class ResourceCue:
     bands: tuple[HsvBand, ...]
     min_area: int = 20
 
+    @classmethod
+    def from_settings(cls, cue: ResourceCueSetting) -> ResourceCue:
+        """Rehydrate the cv2-capable cue from its pure-data config (Approach B)."""
 
-# Coarse, overlap-tolerant signatures. Tuned for recall, not precision.
-DEFAULT_RESOURCE_CUES: tuple[ResourceCue, ...] = (
-    ResourceCue("tree", (HsvBand(h_lo=35, h_hi=85, s_lo=40, v_lo=30),)),
-    ResourceCue("mine", (HsvBand(h_lo=0, h_hi=179, s_lo=0, s_hi=50, v_lo=50, v_hi=190),)),
-    ResourceCue(
-        "bush",
-        (
-            HsvBand(h_lo=0, h_hi=8, s_lo=90, v_lo=60),
-            HsvBand(h_lo=168, h_hi=179, s_lo=90, v_lo=60),
-        ),
-    ),
-    ResourceCue("fauna", (HsvBand(h_lo=9, h_hi=25, s_lo=60, s_hi=200, v_lo=40, v_hi=190),)),
+        return cls(
+            entity_type=cue.entity_type,
+            bands=tuple(HsvBand(**band.model_dump()) for band in cue.bands),
+            min_area=cue.min_area,
+        )
+
+
+def resource_cues_from_settings(
+    cues: Sequence[ResourceCueSetting],
+) -> tuple[ResourceCue, ...]:
+    """Map the pure-data cue list into cv2-capable cues at the boundary."""
+
+    return tuple(ResourceCue.from_settings(cue) for cue in cues)
+
+
+# Coarse, overlap-tolerant signatures (recall over precision), derived from the
+# config default so there is a single source of truth.
+DEFAULT_RESOURCE_CUES: tuple[ResourceCue, ...] = resource_cues_from_settings(
+    PerceptionSettings().resource_cues
 )
 
 

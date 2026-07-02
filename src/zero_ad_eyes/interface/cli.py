@@ -35,15 +35,16 @@ def _offline_source(recording: str) -> FrameSource:
     return ImageFolderSource(path) if path.is_dir() else VideoFileSource(path)
 
 
-def _perception_model(detector: str) -> PerceptionModel:
+def _perception_model(detector: str, config: Config) -> PerceptionModel:
     """The detection model behind the seam. ``classical`` is the v1 default — the
-    E6a/E11 baseline that actually perceives from pixels; ``stub`` emits nothing
-    (plumbing only). The learned adapter (MP4) would slot in here unchanged."""
+    E6a/E11 baseline that actually perceives from pixels, built from cfg.perception
+    (resource cues + toggle); ``stub`` emits nothing (plumbing only). The learned
+    adapter (MP4) would slot in here unchanged."""
 
     if detector == "classical":
         from zero_ad_eyes.infrastructure.perception import ClassicalPerceptionModel
 
-        return ClassicalPerceptionModel()
+        return ClassicalPerceptionModel.from_settings(config.perception)
     return StubPerceptionModel()
 
 
@@ -78,7 +79,7 @@ def _build_offline_pipeline(
 
     return PerceptionPipeline(
         _offline_source(recording),
-        _perception_model(detector),
+        _perception_model(detector, cfg),
         preprocessor=PreprocessingPipeline(),
         calibrator=HudCalibrator(),
         self_check=LayoutSelfCheck(),
@@ -352,7 +353,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             source = _synthetic_source(args.frames, args.width, args.height)
-            model = _perception_model(args.detector)
+            model = _perception_model(args.detector, config)
             pipeline = PerceptionPipeline(source, model)  # type: ignore[arg-type]
         for world_model in pipeline.run():
             print(world_model.model_dump_json())
