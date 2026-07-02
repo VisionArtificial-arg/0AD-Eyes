@@ -25,6 +25,7 @@ def _settings() -> CalibrationSettings:
         ui_scale_max=3.0,
         selfcheck_match_threshold=0.5,
         selfcheck_use_anchors=True,
+        persist_profiles=False,
     )
 
 

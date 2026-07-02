@@ -83,3 +83,47 @@ def test_print_report_measured_failure_is_fail_exit_one(
 
     assert code == 1
     assert "eval: FAIL" in out
+
+
+# --- B3 disk calibration store wiring (opt-in via config) ------------------- #
+
+
+def test_persist_profiles_off_by_default_wires_no_store(tmp_path: Path) -> None:
+    from zero_ad_eyes.infrastructure.calibration import HudCalibrator
+
+    _write_recording(tmp_path)
+    pipeline = _build_offline_pipeline(str(tmp_path), detector="classical")
+
+    # Default config has persist_profiles=False → no disk store, no CWD writes.
+    assert isinstance(pipeline._calibrator, HudCalibrator)
+    assert pipeline._calibrator._store is None
+
+
+def test_persist_profiles_on_wires_store_at_configured_dir(tmp_path: Path) -> None:
+    from zero_ad_eyes.infrastructure.calibration import (
+        CalibrationProfileStore,
+        HudCalibrator,
+    )
+    from zero_ad_eyes.infrastructure.config import load_config
+    from zero_ad_eyes.interface.cli import _build_offline_pipeline
+    from zero_ad_eyes.interface.default_config import default_config
+
+    recording = tmp_path / "rec"
+    recording.mkdir()
+    _write_recording(recording)
+    profiles = tmp_path / "profiles"
+
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        '{"calibration": {"persist_profiles": true}, '
+        f'"paths": {{"calibration_dir": "{profiles}"}}}}',
+        encoding="utf-8",
+    )
+    cfg = load_config(default_config(), config_path, env={})
+
+    pipeline = _build_offline_pipeline(str(recording), detector="classical", config=cfg)
+
+    assert isinstance(pipeline._calibrator, HudCalibrator)
+    store = pipeline._calibrator._store
+    assert isinstance(store, CalibrationProfileStore)
+    assert store.directory == profiles

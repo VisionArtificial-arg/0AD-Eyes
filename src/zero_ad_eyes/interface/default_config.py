@@ -270,6 +270,7 @@ def default_config() -> Config:
             ui_scale_max=3.0,
             selfcheck_match_threshold=0.5,
             selfcheck_use_anchors=True,
+            persist_profiles=False,
         ),
         perf=PerfSettings(latency_target_ms=66.0, throughput_target_fps=15.0),
         pipeline=PipelineSettings(recalibrate_interval=30),

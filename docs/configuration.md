@@ -102,7 +102,7 @@ bool, `"--psm 6"` → string).
 | `hud` | top-bar + selection sub-region fractions (C1–C5), `ocr_config` (Tesseract mode) |
 | `tracking` | IoU tracker (`iou_threshold`, `min_hits`, `max_staleness`, `decay`) + event thresholds (`combat_drop`, `depletion_health`) |
 | `preprocessing` | HUD / scene chain parameters (CLAHE, blur, bilateral) |
-| `calibration` | HUD region `ratios`, UI-scale bounds, self-check thresholds (EPIC B) |
+| `calibration` | HUD region `ratios`, UI-scale bounds, self-check thresholds, `persist_profiles` (EPIC B; B3 cross-session reuse) |
 | `perf` | NF1/NF2 targets (`latency_target_ms`, `throughput_target_fps`) |
 | `pipeline` | `recalibrate_interval` (frames between B4 self-checks) |
 | `acquisition` | offline replay (`offline_fps`, `image_extensions`) + live capture (`live_monitor`, `live_fps`) |
@@ -139,6 +139,15 @@ window is required in full — all six of `h_lo`, `h_hi`, `s_lo`, `s_hi`, `v_lo`
 
 ```json
 { "acquisition": { "offline_fps": 10.0 }, "hud": { "ocr_config": "--psm 6" } }
+```
+
+**Reuse calibration across sessions (B3).** Off by default (no run writes to disk).
+Enable the disk-backed profile store; profiles are written to and reused from
+`paths.calibration_dir`, keyed by resolution + theme, so a resolution/theme calibrated
+once skips first-frame HUD detection on later runs:
+
+```json
+{ "calibration": { "persist_profiles": true }, "paths": { "calibration_dir": "calibration" } }
 ```
 
 ## How it maps to the code

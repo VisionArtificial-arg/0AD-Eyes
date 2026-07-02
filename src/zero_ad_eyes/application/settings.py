@@ -441,6 +441,9 @@ class CalibrationSettings(BaseModel):
     ui_scale_max: float = Field(gt=0.0)  # UI-scale clamp upper bound (B1)
     selfcheck_match_threshold: float = Field(ge=0.0, le=1.0)  # B4
     selfcheck_use_anchors: bool
+    persist_profiles: (
+        bool  # B3 — reuse/persist calibration to paths.calibration_dir across sessions
+    )
 
 
 class PerfSettings(BaseModel):

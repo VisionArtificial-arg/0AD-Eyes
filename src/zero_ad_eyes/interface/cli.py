@@ -83,7 +83,11 @@ def _build_pipeline(
     supplied), so the pipeline itself stays config-free — it only ever sees ports.
     """
 
-    from zero_ad_eyes.infrastructure.calibration import HudCalibrator, LayoutSelfCheck
+    from zero_ad_eyes.infrastructure.calibration import (
+        CalibrationProfileStore,
+        HudCalibrator,
+        LayoutSelfCheck,
+    )
     from zero_ad_eyes.infrastructure.hud.reader import ClassicalHudReader
     from zero_ad_eyes.infrastructure.minimap.reader import ClassicalMinimapReader
     from zero_ad_eyes.infrastructure.perception import ClassicalEntityEnricher
@@ -96,11 +100,20 @@ def _build_pipeline(
 
     cfg = config if config is not None else default_config()
 
+    # B3 cross-session reuse is opt-in (cfg.calibration.persist_profiles): only then
+    # does a disk-backed store get wired, and only then does a run write profiles to
+    # cfg.paths.calibration_dir. Off by default → no surprise writes to CWD.
+    profile_store = (
+        CalibrationProfileStore(cfg.paths.calibration_dir)
+        if cfg.calibration.persist_profiles
+        else None
+    )
+
     return PerceptionPipeline(
         source,
         _perception_model(detector, cfg),
         preprocessor=PreprocessingPipeline(),
-        calibrator=HudCalibrator.from_settings(cfg.calibration),
+        calibrator=HudCalibrator.from_settings(cfg.calibration, store=profile_store),
         self_check=LayoutSelfCheck.from_settings(cfg.calibration),
         hud_reader=ClassicalHudReader.from_settings(cfg.hud),
         minimap_reader=ClassicalMinimapReader.from_settings(cfg.minimap),

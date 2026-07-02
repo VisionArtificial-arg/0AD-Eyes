@@ -439,7 +439,8 @@
     "ui_scale_min": 0.5,
     "ui_scale_max": 3.0,
     "selfcheck_match_threshold": 0.5,
-    "selfcheck_use_anchors": true
+    "selfcheck_use_anchors": true,
+    "persist_profiles": false
   },
   "perf": {
     "latency_target_ms": 66.0,
