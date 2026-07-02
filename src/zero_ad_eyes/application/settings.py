@@ -577,6 +577,15 @@ class PipelineSettings(BaseModel):
     recalibrate_interval: int = Field(default=30, ge=1)  # frames between B4 self-checks
 
 
+class AcquisitionSettings(BaseModel):
+    """Offline replay tuning (EPIC A). Live-capture knobs are added when wired."""
+
+    model_config = ConfigDict(frozen=True)
+
+    offline_fps: float = Field(default=30.0, gt=0.0)  # image-folder replay pacing
+    image_extensions: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -602,3 +611,4 @@ class Config(BaseModel):
     calibration: CalibrationSettings = Field(default_factory=CalibrationSettings)
     perf: PerfSettings = Field(default_factory=PerfSettings)
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
+    acquisition: AcquisitionSettings = Field(default_factory=AcquisitionSettings)

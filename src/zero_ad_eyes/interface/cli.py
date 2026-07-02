@@ -15,7 +15,7 @@ from pathlib import Path
 
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
 from zero_ad_eyes.application.ports import FrameSource, PerceptionModel, StageProfiler
-from zero_ad_eyes.application.settings import Config
+from zero_ad_eyes.application.settings import AcquisitionSettings, Config
 from zero_ad_eyes.infrastructure.config.config import load_config
 from zero_ad_eyes.infrastructure.model.stub_adapter import StubPerceptionModel
 
@@ -26,13 +26,20 @@ def _load_config(path: str | None) -> Config:
     return load_config(path)
 
 
-def _offline_source(recording: str) -> FrameSource:
-    """A recording is an image folder or a video file — pick the matching source."""
+def _offline_source(recording: str, acquisition: AcquisitionSettings) -> FrameSource:
+    """A recording is an image folder or a video file — pick the matching source.
+
+    Image-folder replay is config-paced (offline_fps + accepted extensions); a video
+    file carries its own frame clock, so only the folder source takes config."""
 
     from zero_ad_eyes.infrastructure.acquisition import ImageFolderSource, VideoFileSource
 
     path = Path(recording)
-    return ImageFolderSource(path) if path.is_dir() else VideoFileSource(path)
+    if path.is_dir():
+        return ImageFolderSource(
+            path, extensions=acquisition.image_extensions, fps=acquisition.offline_fps
+        )
+    return VideoFileSource(path)
 
 
 def _perception_model(detector: str, config: Config) -> PerceptionModel:
@@ -78,7 +85,7 @@ def _build_offline_pipeline(
     cfg = config or Config()
 
     return PerceptionPipeline(
-        _offline_source(recording),
+        _offline_source(recording, cfg.acquisition),
         _perception_model(detector, cfg),
         preprocessor=PreprocessingPipeline(),
         calibrator=HudCalibrator.from_settings(cfg.calibration),
