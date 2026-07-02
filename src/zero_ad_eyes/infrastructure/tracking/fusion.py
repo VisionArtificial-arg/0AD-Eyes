@@ -149,17 +149,20 @@ def fuse_entities(
 class ClassicalEntityFuser:
     """``EntityFuser`` adapter (G4/G5): folds minimap blips into the entity set.
 
-    The tracked entities and the minimap blips do not yet share a coordinate frame —
-    tracker entities carry a *screen* bbox while blips carry a *world* position, and
-    the offline path has no screen→world projector (F1) to bridge them. So this adapter
-    does the half of G4 that IS well-defined today: it surfaces the blips that lie
-    **outside the camera viewport** — units the main view cannot see — as their own
-    world-space entities, and deliberately drops in-viewport blips (which would be
-    double-counts of on-screen tracked entities it cannot yet merge with). It still
-    routes everything through :func:`fuse_entities` with ``cfg.geometry`` (match_radius,
-    agreement_scale), so once entities gain world positions (F1 wired) the positional
-    match-and-merge activates with no change here. When the viewport is unknown it emits
-    no hints, rather than risk double-counting.
+    Runs after the F1 ``ScreenToWorldProjector`` stage, so tracked entities may now
+    carry a ``world_pos``. This adapter stays deliberately conservative: it surfaces
+    the blips **outside** the camera viewport — units the main view cannot see — as
+    their own world-space entities via :func:`fuse_entities` (``cfg.geometry``
+    match_radius/agreement_scale), and drops **in-viewport** blips. Off-viewport hints
+    sit outside the projected entities' region, so they never spuriously match and are
+    appended as new entities; in-viewport blips are not merged into on-screen entities
+    yet because that depends on the F1 projection accuracy, which is unvalidated until
+    real ground truth exists (surfacing a mismatch would double-count). When the
+    viewport is unknown it emits no hints, rather than risk double-counting.
+
+    The F1 value delivered here is the entities' ``world_pos`` itself (consumed by the
+    spatial/occupancy grid and the output contract); full in-viewport match-and-merge
+    is a later step gated on projection validation.
     """
 
     def __init__(self, *, match_radius: float, agreement_scale: float) -> None:

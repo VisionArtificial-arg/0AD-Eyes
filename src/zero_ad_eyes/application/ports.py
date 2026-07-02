@@ -104,6 +104,22 @@ class EntityEnricher(Protocol):
 
 
 @runtime_checkable
+class ScreenToWorldProjector(Protocol):
+    """EPIC F/F1 — projects screen-space entities into world coordinates.
+
+    Recovers a ground-plane screen→world map for the frame (e.g. from the minimap
+    camera-viewport footprint) and stamps a ``world_pos`` onto each entity that has a
+    screen box but no world position yet. Runs after enrichment and before fusion, so
+    the cross-surface (minimap) merge has both estimates in the same frame. Entities
+    are returned unchanged when no map can be recovered.
+    """
+
+    def project(
+        self, entities: tuple[Entity, ...], minimap: MinimapModel, frame: Frame
+    ) -> tuple[Entity, ...]: ...
+
+
+@runtime_checkable
 class EntityFuser(Protocol):
     """EPIC G/G4/G5 — reconciles the tracked entities with the minimap surface.
 

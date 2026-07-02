@@ -88,6 +88,7 @@ def _build_pipeline(
         HudCalibrator,
         LayoutSelfCheck,
     )
+    from zero_ad_eyes.infrastructure.geometry import ViewportCameraProjector
     from zero_ad_eyes.infrastructure.hud.reader import ClassicalHudReader
     from zero_ad_eyes.infrastructure.minimap.reader import ClassicalMinimapReader
     from zero_ad_eyes.infrastructure.perception import ClassicalEntityEnricher
@@ -120,6 +121,7 @@ def _build_pipeline(
         recalibrate_interval=cfg.pipeline.recalibrate_interval,
         tracker=IouTracker.from_settings(cfg.tracking),
         enricher=ClassicalEntityEnricher.from_settings(cfg.perception),
+        projector=ViewportCameraProjector.from_settings(cfg.geometry),
         fuser=ClassicalEntityFuser.from_settings(cfg.geometry),
         event_detector=ClassicalEventDetector.from_settings(cfg.tracking),
         profiler=profiler,

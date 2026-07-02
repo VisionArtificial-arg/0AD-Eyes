@@ -8,9 +8,12 @@ ground-plane assumption (REQUIREMENTS.md §4.6, CV-22..26):
   updates across frames (F2), and projection-error confidence (F4).
 - geometric-transform builders for pan / zoom / rotation (F2; CV-25).
 - ``reconcile`` — fuses a main-view and a minimap world estimate (F3; CV-26).
+- ``ViewportCameraProjector`` — the F1 *integration* adapter: recovers the
+  screen→world map from the minimap viewport quad and projects entities. Being an
+  adapter (not a primitive) it also touches ``application`` (``Frame``, settings).
 
-It imports only from ``zero_ad_eyes.domain`` and this package; it holds no port of
-its own but exposes ``CameraProjector`` as its public surface.
+The geometry *primitives* (``Homography``, ``CameraProjector``, ``reconcile``) import
+only from ``zero_ad_eyes.domain`` and this package.
 """
 
 from __future__ import annotations
@@ -19,11 +22,13 @@ from .fusion import reconcile
 from .homography import DegenerateHomographyError, Homography
 from .projector import CameraProjector
 from .transforms import chain, rotation, scaling, translation
+from .viewport_projection import ViewportCameraProjector
 
 __all__ = [
     "CameraProjector",
     "DegenerateHomographyError",
     "Homography",
+    "ViewportCameraProjector",
     "chain",
     "reconcile",
     "rotation",

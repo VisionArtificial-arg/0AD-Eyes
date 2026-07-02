@@ -27,6 +27,8 @@ def test_build_offline_pipeline_wires_the_real_chain(tmp_path: Path) -> None:
     assert pipeline._minimap_reader is not None
     assert pipeline._tracker is not None
     assert pipeline._enricher is not None
+    assert pipeline._projector is not None  # F1 screen->world stage
+    assert pipeline._fuser is not None
 
 
 def test_run_over_image_folder_emits_v0_2_world_models(
