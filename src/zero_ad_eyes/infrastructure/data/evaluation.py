@@ -228,13 +228,20 @@ def _mean_hud_error(predicted: Sequence[WorldModel], truth: Sequence[WorldModel]
 
 
 def ownership_accuracy(
-    predicted: Sequence[WorldModel], truth: Sequence[WorldModel]
+    predicted: Sequence[WorldModel],
+    truth: Sequence[WorldModel],
+    iou_threshold: float = 0.5,
 ) -> float | None:
     """Fraction of ground-truth entities whose ownership is predicted correctly.
 
-    Entities are matched by their (tracking) ``entity_id``. A ground-truth entity
-    with no same-id prediction counts as incorrect. Returns ``None`` if there are
-    no ground-truth entities at all.
+    Ground-truth and predicted entities are matched **geometrically**, by screen-box
+    IoU per frame (the same association ``tracking_mota`` uses). Matching by
+    ``entity_id`` would be wrong here: the predicted id is the tracker's own track id
+    while the ground-truth id is the engine entity id — the two id spaces never
+    coincide when perceiving from pixels, so id-matching would score ~0 on real data.
+    A ground-truth entity with no IoU-matched prediction counts as incorrect (you
+    cannot read the owner of an entity you failed to locate). Returns ``None`` if
+    there are no ground-truth entities at all.
     """
 
     by_pred_frame = {wm.meta.frame_id: wm for wm in predicted}
@@ -242,10 +249,13 @@ def ownership_accuracy(
     total = 0
     for gt in truth:
         pred = by_pred_frame.get(gt.meta.frame_id)
-        pred_by_id = {e.entity_id: e for e in pred.entities} if pred else {}
+        pred_entities = pred.entities if pred else ()
+        matches = _match_frame(pred_entities, gt.entities, iou_threshold)
+        pred_by_id = {entity.entity_id: entity for entity in pred_entities}
         for gt_entity in gt.entities:
             total += 1
-            match = pred_by_id.get(gt_entity.entity_id)
+            matched_pred_id = matches.get(gt_entity.entity_id)
+            match = pred_by_id.get(matched_pred_id) if matched_pred_id is not None else None
             if match is not None and match.ownership == gt_entity.ownership:
                 correct += 1
     if total == 0:
@@ -467,7 +477,7 @@ def evaluate(
     else:
         detection_metric = MetricResult.pending_model("detection_map", cfg.detection_map_min, True)
 
-    ownership = ownership_accuracy(predicted, truth)
+    ownership = ownership_accuracy(predicted, truth, cfg.iou_threshold)
     ownership_metric = MetricResult.computed(
         "ownership_accuracy",
         ownership if ownership is not None else 1.0,

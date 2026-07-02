@@ -101,6 +101,37 @@ def test_ownership_accuracy_two_of_three() -> None:
     assert math.isclose(accuracy, 2.0 / 3.0)
 
 
+def test_ownership_accuracy_matches_by_iou_not_entity_id() -> None:
+    # Predicted ids come from the tracker; ground-truth ids from the engine. They
+    # do not coincide. Ownership must still be scored by geometric (IoU) match.
+    gt = WorldModel(
+        meta=_meta(0),
+        entities=(
+            _entity(1, BOX_A, Ownership.SELF),
+            _entity(2, BOX_B, Ownership.ENEMY),
+        ),
+    )
+    pred = WorldModel(
+        meta=_meta(0),
+        entities=(
+            _entity(88, BOX_A, Ownership.SELF),  # different id, same box as gt 1
+            _entity(99, BOX_B, Ownership.ENEMY),  # different id, same box as gt 2
+        ),
+    )
+    # Id-based matching would score 0.0 (no shared ids); IoU matching scores 1.0.
+    accuracy = ownership_accuracy([pred], [gt])
+    assert accuracy is not None
+    assert math.isclose(accuracy, 1.0)
+
+
+def test_ownership_accuracy_unmatched_ground_truth_is_incorrect() -> None:
+    # A ground-truth entity the detector never located cannot have its owner read.
+    gt = WorldModel(meta=_meta(0), entities=(_entity(1, BOX_A, Ownership.SELF),))
+    pred = WorldModel(meta=_meta(0), entities=(_entity(1, BOX_B, Ownership.SELF),))
+    accuracy = ownership_accuracy([pred], [gt])
+    assert accuracy == 0.0
+
+
 # --- tracking MOTA --------------------------------------------------------- #
 
 
