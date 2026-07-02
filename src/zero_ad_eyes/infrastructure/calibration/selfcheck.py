@@ -12,10 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from zero_ad_eyes.application.frames import Frame
-from zero_ad_eyes.domain.calibration import Calibration
+from zero_ad_eyes.domain.calibration import Calibration, CalibrationCheck
 
 from .anchors import bottom_band_fraction, top_band_fraction
 
@@ -28,16 +26,6 @@ _DEFAULT_MATCH_THRESHOLD = 0.5
 # Resolution matches but no anchors could be recovered to confirm the layout: we can
 # neither confirm nor deny, so report a deliberately middling confidence.
 _UNVERIFIABLE_CONFIDENCE = 0.5
-
-
-class CalibrationCheck(BaseModel):
-    """Verdict of comparing a live frame against a calibration."""
-
-    model_config = ConfigDict(frozen=True)
-
-    matches: bool
-    confidence: float = Field(ge=0.0, le=1.0)
-    reason: str = ""
 
 
 def _agreement(observed: float, expected: float) -> float:

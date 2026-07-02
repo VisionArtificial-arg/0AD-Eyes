@@ -40,7 +40,7 @@ def _build_offline_pipeline(
     detection baseline (E6a) meanwhile.
     """
 
-    from zero_ad_eyes.infrastructure.calibration import HudCalibrator
+    from zero_ad_eyes.infrastructure.calibration import HudCalibrator, LayoutSelfCheck
     from zero_ad_eyes.infrastructure.hud.reader import ClassicalHudReader
     from zero_ad_eyes.infrastructure.minimap.reader import ClassicalMinimapReader
     from zero_ad_eyes.infrastructure.perception import (
@@ -58,6 +58,7 @@ def _build_offline_pipeline(
         model,
         preprocessor=PreprocessingPipeline(),
         calibrator=HudCalibrator(),
+        self_check=LayoutSelfCheck(),
         hud_reader=ClassicalHudReader(),
         minimap_reader=ClassicalMinimapReader(),
         tracker=IouTracker(),

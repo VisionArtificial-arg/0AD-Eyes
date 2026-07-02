@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from typing import Protocol, runtime_checkable
 
-from zero_ad_eyes.domain.calibration import Calibration
+from zero_ad_eyes.domain.calibration import Calibration, CalibrationCheck
 from zero_ad_eyes.domain.detections import Detections
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.events import Event
@@ -45,6 +45,18 @@ class Calibrator(Protocol):
     """EPIC B — locates HUD regions in the current frame."""
 
     def calibrate(self, frame: Frame) -> Calibration: ...
+
+
+@runtime_checkable
+class LayoutChecker(Protocol):
+    """EPIC B/B4 — cheaply verifies a *reused* calibration still matches the live frame.
+
+    Lets the pipeline re-detect the HUD only when the layout has actually drifted
+    (resolution/UI-scale/theme change) rather than every frame. Reports agreement; it
+    never recomputes the calibration itself.
+    """
+
+    def verify(self, frame: Frame, calibration: Calibration) -> CalibrationCheck: ...
 
 
 @runtime_checkable

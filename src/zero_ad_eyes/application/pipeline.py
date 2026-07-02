@@ -22,6 +22,7 @@ from .ports import (
     EventSource,
     FrameSource,
     HudReader,
+    LayoutChecker,
     MinimapReader,
     PerceptionModel,
     Preprocessor,
@@ -29,6 +30,12 @@ from .ports import (
     Tracker,
     WorldModelSink,
 )
+
+# Default frames between B4 layout self-checks. The self-check re-runs anchor
+# detection (the dominant calibration cost), so it is amortised over an interval
+# rather than paid every frame; layout changes are rare and need not be caught
+# within a single frame.
+DEFAULT_RECALIBRATE_INTERVAL = 30
 
 
 def _same_resolution(frame: Frame, calibration: Calibration) -> bool:
@@ -54,6 +61,8 @@ class PerceptionPipeline:
         *,
         preprocessor: Preprocessor | None = None,
         calibrator: Calibrator | None = None,
+        self_check: LayoutChecker | None = None,
+        recalibrate_interval: int = DEFAULT_RECALIBRATE_INTERVAL,
         hud_reader: HudReader | None = None,
         minimap_reader: MinimapReader | None = None,
         tracker: Tracker | None = None,
@@ -66,6 +75,8 @@ class PerceptionPipeline:
         self._model = model
         self._preprocessor = preprocessor
         self._calibrator = calibrator
+        self._self_check = self_check
+        self._recalibrate_interval = recalibrate_interval
         self._hud_reader = hud_reader
         self._minimap_reader = minimap_reader
         self._tracker = tracker
@@ -83,29 +94,52 @@ class PerceptionPipeline:
         """Process every frame from the source into a world model."""
 
         calibration: Calibration | None = None
+        frames_since_check = 0
         for raw in self._source.frames():
             if self._preprocessor is not None:
                 with self._stage("preprocess"):
                     frame = self._preprocessor.process(raw)
             else:
                 frame = raw
-            calibration = self._calibrate(frame, calibration)
+            calibration, frames_since_check = self._resolve_calibration(
+                frame, calibration, frames_since_check
+            )
             world_model = self._perceive(frame, calibration)
             if self._sink is not None:
                 with self._stage("sink"):
                     self._sink.publish(world_model)
             yield world_model
 
-    def _calibrate(self, frame: Frame, previous: Calibration | None) -> Calibration | None:
+    def _resolve_calibration(
+        self, frame: Frame, previous: Calibration | None, frames_since_check: int
+    ) -> tuple[Calibration | None, int]:
+        """Reuse (B3) vs re-detect, with a periodic layout self-check (B4).
+
+        Calibration is session-stable and keyed by resolution (A4), so the prior
+        profile is reused in-memory — HUD calibration is the dominant classical-path
+        cost. A fresh detection happens only when: there is none yet, the resolution
+        changed, or (every ``recalibrate_interval`` frames) the self-check reports the
+        live layout has drifted. The self-check re-runs anchor detection, so it is
+        amortised over the interval rather than paid per frame. Returns the calibration
+        to use and the updated frames-since-check counter.
+        """
+
         if self._calibrator is None:
-            return previous
-        # B3: calibration is session-stable and keyed by resolution (A4). Reuse the
-        # prior profile in-memory while the resolution holds — HUD calibration is the
-        # dominant classical-path cost, and re-detecting it every frame is wasted work.
-        # Recalibrate only on the first frame or when the resolution changes (a
-        # layout-change self-check, B4, would be the finer future trigger).
-        if previous is not None and _same_resolution(frame, previous):
-            return previous
+            return previous, frames_since_check
+        if previous is None or not _same_resolution(frame, previous):
+            return self._detect(frame), 0
+
+        if self._self_check is None or frames_since_check + 1 < self._recalibrate_interval:
+            return previous, frames_since_check + 1
+
+        with self._stage("selfcheck"):
+            verdict = self._self_check.verify(frame, previous)
+        if verdict.matches:
+            return previous, 0  # layout confirmed; restart the interval
+        return self._detect(frame), 0
+
+    def _detect(self, frame: Frame) -> Calibration:
+        assert self._calibrator is not None  # only reached when a calibrator is present
         with self._stage("calibrate"):
             return self._calibrator.calibrate(frame)
 
