@@ -31,6 +31,19 @@ from .ports import (
 )
 
 
+def _same_resolution(frame: Frame, calibration: Calibration) -> bool:
+    """Whether ``frame``'s resolution matches the one a calibration was built for.
+
+    Prefers the actual pixel-buffer shape, falling back to declared metadata — the
+    same rule the calibrator uses to read resolution, so reuse and re-detection agree.
+    """
+
+    shape = getattr(frame.image, "shape", None)
+    if shape is not None and len(shape) >= 2:
+        return int(shape[1]) == calibration.width and int(shape[0]) == calibration.height
+    return frame.meta.width == calibration.width and frame.meta.height == calibration.height
+
+
 class PerceptionPipeline:
     """Composes the ports; every collaborator except source+model is optional."""
 
@@ -85,6 +98,13 @@ class PerceptionPipeline:
 
     def _calibrate(self, frame: Frame, previous: Calibration | None) -> Calibration | None:
         if self._calibrator is None:
+            return previous
+        # B3: calibration is session-stable and keyed by resolution (A4). Reuse the
+        # prior profile in-memory while the resolution holds — HUD calibration is the
+        # dominant classical-path cost, and re-detecting it every frame is wasted work.
+        # Recalibrate only on the first frame or when the resolution changes (a
+        # layout-change self-check, B4, would be the finer future trigger).
+        if previous is not None and _same_resolution(frame, previous):
             return previous
         with self._stage("calibrate"):
             return self._calibrator.calibrate(frame)
