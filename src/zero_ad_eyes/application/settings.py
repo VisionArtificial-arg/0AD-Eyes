@@ -586,6 +586,21 @@ class AcquisitionSettings(BaseModel):
     image_extensions: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 
 
+class GeometrySettings(BaseModel):
+    """World-projection / fusion tuning (EPIC F/G5), config-driven (NF7).
+
+    Declaration home for the geometry knobs. ``reconcile`` and ``CameraProjector``
+    already accept these as parameters; they are not yet read here because the fusion
+    / F-series path is not in the offline composition root — they get wired to this
+    section when fusion is integrated.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    camera_error_tolerance: float = Field(default=1.0, gt=0.0)  # F4 1/e error scale
+    fusion_agreement_scale: float = Field(default=1.0, gt=0.0)  # G5 1/e distance discount
+
+
 class Paths(BaseModel):
     """Filesystem locations for recordings and calibration profiles (X2/X3)."""
 
@@ -612,3 +627,4 @@ class Config(BaseModel):
     perf: PerfSettings = Field(default_factory=PerfSettings)
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
     acquisition: AcquisitionSettings = Field(default_factory=AcquisitionSettings)
+    geometry: GeometrySettings = Field(default_factory=GeometrySettings)
