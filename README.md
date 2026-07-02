@@ -32,3 +32,12 @@ just run           # launch the perception layer + overlay
 
 Live screen capture needs an X display; live OCR needs the system `tesseract`
 binary. Offline (recordings/fixtures) runs without either.
+
+## Configuration
+
+Every tuning value (thresholds, palettes, HSV windows, layout fractions, FPS,
+accuracy targets) is config-driven — no code change needed to retune. Pass
+`--config my.json` to `run`/`eval`/`bench`, or override single leaves via `ZAE_*`
+environment variables (defaults < file < env). See
+[`docs/configuration.md`](./docs/configuration.md) for the guide and
+[`docs/config.example.json`](./docs/config.example.json) for the full default tree.
