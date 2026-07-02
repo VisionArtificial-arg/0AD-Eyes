@@ -30,7 +30,8 @@ Snapshot of what is built. Checkboxes below are kept in sync with this table.
 | Model seam MP1–MP3, MP5 (port + stub + parity) | **Done**; **MP4** 🔌 |
 | Data ML1/ML2/ML3/ML8 | **Done**; ML4/ML5/ML6 🔌 (model team); ML7 blocked on MP4 |
 | Tooling X1–X8 (overlay, replay CLI, config, uv+just, docs, CI, lock) | **Done** |
-| Tests T1–T3, T5 | **Done**; **T4** live-smoke (needs a real display) and **T6** perf/NF1–NF2 benchmarks **open** |
+| Tests T1–T3, T5 | **Done**; **T4** live-smoke needs a real display |
+| Perf harness (T6) + per-stage timing (NF6) | **Harness built** (`infrastructure/perf`, `just bench`, `StageProfiler`); live NF1/NF2 *gate* deferred to MP4 + a controlled machine |
 
 **Integration decisions taken (2026-07-01), now implemented:**
 - `EntityEnricher` **port** + classical adapter: a post-tracking stage folds
@@ -463,7 +464,11 @@ Acceptance checklist for the artifact hand-off — until met, MP4 stays open:
 - [x] **T3** Integration test: recording → full world model, scored vs ground truth.
 - [ ] **T4** Live smoke test on a real match with the debug overlay.
 - [x] **T5** Adversarial/edge scenes: heavy fog, mass battles, rare units, mods off.
-- [ ] **T6** Performance benchmarks enforcing NF1/NF2 in CI.
+- [ ] **T6** Performance benchmarks enforcing NF1/NF2 in CI. *(Harness built —
+      `infrastructure/perf`, `just bench`, per-stage NF6 timing via `StageProfiler`;
+      measures latency percentiles + throughput vs targets. The live **enforcement
+      gate** stays open until MP4 + a controlled runner, since the stub latency is
+      provisional and timing gates are machine-dependent.)*
 
 ---
 
@@ -492,11 +497,14 @@ always the locked one.
 | `just eval` | ML8 accuracy harness; 🔌 metrics report `pending-model`, else score a `--dataset`. | `uv run zero-ad-eyes eval` |
 | `just validate` | **The full CI action** = `check` + `test` + `eval`. Green ⇒ CI green. | composition of the above |
 | `just run` | Run the pipeline; `--recording PATH` drives the real classical chain (X1 overlay / live source once a display is available). | `uv run zero-ad-eyes run …` |
+| `just bench` | Perf harness (T6): latency percentiles + throughput + per-stage NF6 timing. Provisional on stub; not in `validate`. | `uv run zero-ad-eyes bench …` |
 | `just fmt` / `just setup` | Auto-format + apply safe fixes / activate committed git hooks + `uv sync`. | `ruff` / `git config core.hooksPath` |
 
 > **Git hooks (committed):** `pre-commit` runs `just check`, `pre-push` runs
-> `just validate`; enable with `just setup`. **NF1/NF2 perf benchmarks (T6) are not
-> yet wired into `just test`.**
+> `just validate`; enable with `just setup`. The perf harness (`just bench`) is
+> **not** in `validate` — timing gates are machine-dependent and the stub latency is
+> provisional; its aggregation logic is covered by pytest instead. The live NF1/NF2
+> **enforcement gate** closes at MP4 on a controlled runner.
 
 - [x] **X6** Author the `justfile` with at least `check`, `test`, `validate`, `run`.
 - [x] **X7** Wire CI to invoke **`just validate`** and nothing else (parity with local).
