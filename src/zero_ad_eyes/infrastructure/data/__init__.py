@@ -32,8 +32,10 @@ from .evaluation import (
     mean_average_precision,
 )
 from .ground_truth import AlignedGroundTruth, EngineStateExport, GroundTruthAligner
+from .harness import AlignBy, evaluate_against_engine
 
 __all__ = [
+    "AlignBy",
     "AlignedGroundTruth",
     "AnnotationSet",
     "CaptureManifest",
@@ -46,5 +48,6 @@ __all__ = [
     "MetricResult",
     "MetricStatus",
     "evaluate",
+    "evaluate_against_engine",
     "mean_average_precision",
 ]
