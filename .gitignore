@@ -20,6 +20,11 @@ build/
 *.pth
 /data/
 /recordings/
+/calibration/
+
+# Local runtime config + run dumps (generated, not versioned)
+/config.json
+/output.txt
 
 # Agent worktrees
 .claude/worktrees/
