@@ -478,5 +478,12 @@
     "camera_error_tolerance": 1.0,
     "fusion_agreement_scale": 1.0,
     "fusion_match_radius": 20.0
+  },
+  "segmentation": {
+    "weights_path": "src/zero_ad_eyes/infrastructure/model/best.pt",
+    "input_height": 288,
+    "input_width": 384,
+    "score_threshold": 0.0,
+    "min_region_area": 16
   }
 }

@@ -514,6 +514,23 @@ class Paths(BaseModel):
     calibration_dir: Path
 
 
+class SegmentationModelSettings(BaseModel):
+    """Learned U-Net segmentation adapter tuning (MP4), config-driven (NF7).
+
+    ``input_height``/``input_width`` and the [0,1] scaling must match the training
+    preprocessing (frame → RGB → resize (W×H) → float32/255, no ImageNet mean/std).
+    ``score_threshold`` and ``min_region_area`` are the adapter's seg→entity denoise
+    knobs (the model itself has no confidence threshold — argmax always wins)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    weights_path: str
+    input_height: int = Field(gt=0)
+    input_width: int = Field(gt=0)
+    score_threshold: float = Field(ge=0.0, le=1.0)
+    min_region_area: int = Field(ge=0)
+
+
 class Config(BaseModel):
     """The single, typed configuration root (X3). Built only from explicit values —
     see ``interface.default_config.default_config`` for the canonical default set."""
@@ -533,3 +550,4 @@ class Config(BaseModel):
     pipeline: PipelineSettings
     acquisition: AcquisitionSettings
     geometry: GeometrySettings
+    segmentation: SegmentationModelSettings

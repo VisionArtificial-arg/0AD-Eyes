@@ -43,6 +43,7 @@ from zero_ad_eyes.application.settings import (
     PreprocessingSettings,
     ResourceCueSetting,
     ScenePipelineSettings,
+    SegmentationModelSettings,
     SelectionCueSettings,
     SelectionPanelLayoutSettings,
     StateCueSettings,
@@ -294,5 +295,14 @@ def default_config() -> Config:
             camera_error_tolerance=1.0,
             fusion_agreement_scale=1.0,
             fusion_match_radius=20.0,
+        ),
+        segmentation=SegmentationModelSettings(
+            # Matches the U-Net training preprocessing: RGB, resize to 384×288 (W×H),
+            # float32/255 (no ImageNet mean/std). Weights ship in-package (best.pt).
+            weights_path="src/zero_ad_eyes/infrastructure/model/best.pt",
+            input_height=288,
+            input_width=384,
+            score_threshold=0.0,  # model has no confidence gate; keep all argmax blobs
+            min_region_area=16,  # drop pixel-speckle blobs (seg→entity denoise)
         ),
     )

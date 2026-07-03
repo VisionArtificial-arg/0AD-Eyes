@@ -83,7 +83,7 @@ def _perception_model(detector: str, config: Config) -> PerceptionModel:
     if detector == "learned":
         from zero_ad_eyes.infrastructure.model import SegmentationPerceptionModel
 
-        return SegmentationPerceptionModel.from_weights()
+        return SegmentationPerceptionModel.from_settings(config.segmentation)
     return StubPerceptionModel()
 
 

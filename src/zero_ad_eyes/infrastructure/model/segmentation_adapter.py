@@ -36,6 +36,8 @@ from zero_ad_eyes.domain.taxonomy import EntityKind
 if TYPE_CHECKING:  # torch only present with the `learned` extra
     import torch
 
+    from zero_ad_eyes.application.settings import SegmentationModelSettings
+
 # --- Model-intrinsic constants (tied to best.pt; not user tunables) --------- #
 
 DEFAULT_WEIGHTS = Path(__file__).with_name("best.pt")
@@ -91,11 +93,11 @@ _EMIT_CLASSES: frozenset[int] = frozenset({9, 10, 11, 12, 14, 15, 16})
 
 # --- Preprocessing / post-processing defaults (v1; pre-config) -------------- #
 
-INPUT_HEIGHT = 544  # divisible by 16 (four /2 downsamples); ~16:9 for 1920×1080
-INPUT_WIDTH = 960
-PIXEL_SCALE = 1.0 / 255.0  # neutral [0,1] scaling (contract v1 default normalization)
-SCORE_THRESHOLD = 0.30  # drop blobs whose mean class-probability is below this
-MIN_REGION_AREA = 64  # drop connected components smaller than this (tensor pixels)
+INPUT_HEIGHT = 288  # training input is 384×288 (W×H) → tensor (1, 3, 288, 384)
+INPUT_WIDTH = 384
+PIXEL_SCALE = 1.0 / 255.0  # [0,1] scaling; no ImageNet mean/std (matches training)
+SCORE_THRESHOLD = 0.0  # the model has no confidence gate — argmax always wins
+MIN_REGION_AREA = 16  # drop pixel-speckle components (seg→entity denoise, adapter concern)
 
 
 class SegmentationPerceptionModel:
@@ -139,6 +141,20 @@ class SegmentationPerceptionModel:
         model.to(resolved)
         model.eval()
         return cls(model, device=resolved, **kwargs)
+
+    @classmethod
+    def from_settings(
+        cls, settings: SegmentationModelSettings, *, device: str | None = None
+    ) -> Any:
+        """Build the adapter from typed config (NF7 composition-root wiring)."""
+
+        return cls.from_weights(
+            settings.weights_path,
+            device=device,
+            input_size=(settings.input_height, settings.input_width),
+            score_threshold=settings.score_threshold,
+            min_region_area=settings.min_region_area,
+        )
 
     def infer(self, frame: Frame, roi: ScreenBBox | None = None) -> Detections:
         import torch
