@@ -3,9 +3,9 @@
 ``StubPerceptionModel`` (MP3) satisfies the ``PerceptionModel`` port without a
 trained model, so the whole pipeline runs today. ``SegmentationPerceptionModel``
 (MP4) is the real adapter over the delivered U-Net weights (``best.pt``); it needs
-the optional ``learned`` extra (torch) and imports it lazily, so this package stays
-importable on the core numpy+opencv stack. Parity tests (MP5) assert both satisfy
-the identical contract.
+the optional torch extra (``uv sync --extra gpu`` or ``--extra cpu``) and imports it
+lazily, so this package stays importable on the core numpy+opencv stack. Parity tests
+(MP5) assert both satisfy the identical contract.
 """
 
 from __future__ import annotations

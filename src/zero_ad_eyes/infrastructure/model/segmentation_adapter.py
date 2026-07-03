@@ -5,9 +5,10 @@ promises: run the U-Net, argmax to a class map, then per foreground class run
 connected-components to recover one ``Detection`` (bbox + coarse ``EntityKind``)
 per blob. Every detection is tagged :class:`Provenance.LEARNED`.
 
-Torch is a heavy, *optional* dependency (`uv sync --extra learned`); it and the
-:mod:`unet` architecture are imported lazily inside ``from_weights`` so the core
-(numpy + opencv) stays framework-free and headless-importable.
+Torch is a heavy, *optional* dependency (`uv sync --extra gpu` or `--extra cpu`); it
+and the :mod:`unet` architecture are imported lazily inside ``from_weights`` so the
+core (numpy + opencv) stays framework-free and headless-importable. Inference runs on
+CUDA automatically when a GPU is visible (see ``from_weights``).
 
 Deliberate v1 simplifications (config-externalise later, per NF7):
 - input size / normalization / thresholds are named constants here, not yet in the
@@ -104,29 +105,40 @@ class SegmentationPerceptionModel:
         self,
         model: Any,
         *,
+        device: Any = None,
         input_size: tuple[int, int] = (INPUT_HEIGHT, INPUT_WIDTH),
         score_threshold: float = SCORE_THRESHOLD,
         min_region_area: int = MIN_REGION_AREA,
     ) -> None:
-        self._model = model  # a torch.nn.Module in eval mode
+        self._model = model  # a torch.nn.Module in eval mode, on ``device``
+        self._device = device  # torch.device the model + inputs live on (None until loaded)
         self._input_h, self._input_w = input_size
         self._score_threshold = score_threshold
         self._min_region_area = min_region_area
 
     @classmethod
-    def from_weights(cls, weights: Path | str = DEFAULT_WEIGHTS, **kwargs: Any) -> Any:
-        """Load the U-Net weights (needs the `learned` extra) and return the adapter."""
+    def from_weights(
+        cls, weights: Path | str = DEFAULT_WEIGHTS, *, device: str | None = None, **kwargs: Any
+    ) -> Any:
+        """Load the U-Net weights and return the adapter, on GPU when one is visible.
+
+        Needs the optional torch extra (``uv sync --extra gpu`` or ``--extra cpu``).
+        ``device`` defaults to CUDA when ``torch.cuda.is_available()``, else CPU; pass
+        e.g. ``"cpu"`` or ``"cuda:1"`` to pin it.
+        """
 
         import torch
 
         from .unet import UNet
 
-        checkpoint = torch.load(Path(weights), map_location="cpu", weights_only=True)
+        resolved = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        checkpoint = torch.load(Path(weights), map_location=resolved, weights_only=True)
         state = checkpoint["model_state"] if "model_state" in checkpoint else checkpoint
         model = UNet(n_classes=NUM_CLASSES, base_channels=BASE_CHANNELS)
         model.load_state_dict(state)
+        model.to(resolved)
         model.eval()
-        return cls(model, **kwargs)
+        return cls(model, device=resolved, **kwargs)
 
     def infer(self, frame: Frame, roi: ScreenBBox | None = None) -> Detections:
         import torch
@@ -150,7 +162,8 @@ class SegmentationPerceptionModel:
         rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
         resized = cv2.resize(rgb, (self._input_w, self._input_h), interpolation=cv2.INTER_LINEAR)
         chw = np.transpose(resized.astype(np.float32) * PIXEL_SCALE, (2, 0, 1))
-        return torch.from_numpy(np.ascontiguousarray(chw)).unsqueeze(0)
+        tensor = torch.from_numpy(np.ascontiguousarray(chw)).unsqueeze(0)
+        return tensor.to(self._device) if self._device is not None else tensor
 
     def _detections_from_mask(
         self, class_map: np.ndarray, prob_map: np.ndarray, scale_x: float, scale_y: float
