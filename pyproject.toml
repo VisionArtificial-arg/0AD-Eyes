@@ -19,7 +19,7 @@ zero-ad-eyes = "zero_ad_eyes.interface.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.6",
+    "ruff>=0.15,<0.16",
     "mypy>=1.10",
 ]
 

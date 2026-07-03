@@ -237,9 +237,7 @@ class ClassicalHudReader:
             return None
         return max(candidates, key=lambda candidate: candidate[0])[1]
 
-    def _numeric_ocr_texts(
-        self, image: Any, *, include_right_trims: bool = False
-    ) -> Iterable[str]:
+    def _numeric_ocr_texts(self, image: Any, *, include_right_trims: bool = False) -> Iterable[str]:
         """Retry tiny HUD counters on OCR-friendly views of the same crop.
 
         Manual calibration boxes often include the resource icon beside the digits.
@@ -272,9 +270,7 @@ class ClassicalHudReader:
                 start = int(round(image.shape[1] * ratio))
                 trimmed = image[:, start:]
                 trimmed_gray = (
-                    cv2.cvtColor(trimmed, cv2.COLOR_BGR2GRAY)
-                    if trimmed.ndim == 3
-                    else trimmed
+                    cv2.cvtColor(trimmed, cv2.COLOR_BGR2GRAY) if trimmed.ndim == 3 else trimmed
                 )
                 variants.append(scaled(trimmed_gray))
 
