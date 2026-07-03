@@ -11,13 +11,21 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
+from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
-from zero_ad_eyes.application.ports import FrameSource, PerceptionModel, StageProfiler
+from zero_ad_eyes.application.ports import (
+    FrameSource,
+    PerceptionModel,
+    StageProfiler,
+    WorldModelSink,
+)
 from zero_ad_eyes.application.settings import AcquisitionSettings, Config
+from zero_ad_eyes.domain.world_model import WorldModel
 from zero_ad_eyes.infrastructure.config.config import load_config, save_config
 from zero_ad_eyes.infrastructure.model.stub_adapter import StubPerceptionModel
 from zero_ad_eyes.interface.default_config import default_config
@@ -61,10 +69,12 @@ def _offline_source(recording: str, acquisition: AcquisitionSettings) -> FrameSo
 
 
 def _perception_model(detector: str, config: Config) -> PerceptionModel:
-    """The detection model behind the seam. ``classical`` is the v1 default — the
-    E6a/E11 baseline that actually perceives from pixels, built from cfg.perception
-    (resource cues + toggle); ``stub`` emits nothing (plumbing only). The learned
-    adapter (MP4) would slot in here unchanged."""
+    """The main-viewport detector behind the model seam.
+
+    ``stub`` is the default until the model-team adapter lands: it emits no
+    main-scene detections, while HUD/minimap/calibration still run classically.
+    ``classical`` remains an explicit debug baseline only.
+    """
 
     if detector == "classical":
         from zero_ad_eyes.infrastructure.perception import ClassicalPerceptionModel
@@ -73,21 +83,47 @@ def _perception_model(detector: str, config: Config) -> PerceptionModel:
     return StubPerceptionModel()
 
 
+class _LatestFrameSource:
+    """FrameSource decorator that exposes the most recent frame for overlay output."""
+
+    def __init__(self, source: FrameSource) -> None:
+        self._source = source
+        self.latest: Frame | None = None
+
+    def frames(self) -> Iterator[Frame]:
+        for frame in self._source.frames():
+            self.latest = frame
+            yield frame
+
+
+class _OverlaySink:
+    """World-model sink that annotates the latest frame seen by ``_LatestFrameSource``."""
+
+    def __init__(self, frames: _LatestFrameSource, output: Any) -> None:
+        self._frames = frames
+        self._output = output
+
+    def publish(self, world_model: WorldModel) -> None:
+        frame = self._frames.latest
+        if frame is not None:
+            self._output.publish(frame, world_model)
+
+
 def _build_pipeline(
     source: FrameSource,
     *,
-    detector: str = "classical",
+    detector: str = "stub",
     profiler: StageProfiler | None = None,
     config: Config | None = None,
+    sink: WorldModelSink | None = None,
 ) -> PerceptionPipeline:
-    """Wire the real classical chain over any ``FrameSource`` (EPIC A→G integration).
+    """Wire the HUD/minimap classical chain over any ``FrameSource``.
 
-    Every stage is a real classical adapter: preprocessing, HUD calibration +
-    self-check, HUD/minimap readers, IoU tracker, entity enricher, minimap fusion
-    (G4/G5), and the classical detection baseline (E6a/E11) — the v1 default.
-    ``--detector stub`` swaps in the empty stub for plumbing-only runs; a learned
-    adapter (MP4) would swap in here identically. The ``source`` (offline recording
-    or live capture) is chosen by the caller.
+    Classical CV owns preprocessing, HUD calibration + self-check, HUD/minimap
+    readers, post-detection enrichment, tracking, minimap fusion (G4/G5), and
+    events. Main-viewport detection is deliberately behind ``PerceptionModel``:
+    the default stub emits no scene detections until the learned adapter lands.
+    ``--detector classical`` is kept only as a noisy debug baseline.
 
     This is the composition root where config is read (NF7): each adapter is built
     ``from_settings`` of the typed :class:`Config` (the generated defaults when none
@@ -112,14 +148,10 @@ def _build_pipeline(
 
     cfg = config if config is not None else default_config()
 
-    # B3 cross-session reuse is opt-in (cfg.calibration.persist_profiles): only then
-    # does a disk-backed store get wired, and only then does a run write profiles to
-    # cfg.paths.calibration_dir. Off by default → no surprise writes to CWD.
-    profile_store = (
-        CalibrationProfileStore(cfg.paths.calibration_dir)
-        if cfg.calibration.persist_profiles
-        else None
-    )
+    # Manual calibration profiles are always readable from cfg.paths.calibration_dir.
+    # Automatic writes still require cfg.calibration.persist_profiles, enforced by
+    # HudCalibrator.from_settings, so a normal run does not create surprise files.
+    profile_store = CalibrationProfileStore(cfg.paths.calibration_dir)
 
     return PerceptionPipeline(
         source,
@@ -135,6 +167,7 @@ def _build_pipeline(
         projector=ViewportCameraProjector.from_settings(cfg.geometry),
         fuser=ClassicalEntityFuser.from_settings(cfg.geometry),
         event_detector=ClassicalEventDetector.from_settings(cfg.tracking),
+        sink=sink,
         profiler=profiler,
     )
 
@@ -142,11 +175,11 @@ def _build_pipeline(
 def _build_offline_pipeline(
     recording: str,
     *,
-    detector: str = "classical",
+    detector: str = "stub",
     profiler: StageProfiler | None = None,
     config: Config | None = None,
 ) -> PerceptionPipeline:
-    """The classical chain over a recording (image folder or video)."""
+    """The HUD/minimap classical chain over a recording (image folder or video)."""
 
     cfg = config if config is not None else default_config()
     return _build_pipeline(
@@ -159,13 +192,14 @@ def _build_offline_pipeline(
 
 def _build_live_pipeline(
     *,
-    detector: str = "classical",
+    detector: str = "stub",
     profiler: StageProfiler | None = None,
     config: Config | None = None,
     max_frames: int | None = None,
     record_path: Path | None = None,
+    overlay_output: Any | None = None,
 ) -> PerceptionPipeline:
-    """The classical chain over live screen capture (EPIC A1), built from config.
+    """The HUD/minimap classical chain over live screen capture (EPIC A1).
 
     ``cfg.acquisition`` supplies the monitor + target FPS; ``max_frames`` bounds an
     otherwise-endless capture (the ``run`` command maps ``--frames`` onto it) so the
@@ -183,7 +217,12 @@ def _build_live_pipeline(
     source: FrameSource = ScreenCaptureSource.from_settings(cfg.acquisition, max_frames=max_frames)
     if record_path is not None:
         source = VideoFrameRecorder.from_settings(source, record_path, cfg.acquisition)
-    return _build_pipeline(source, detector=detector, profiler=profiler, config=cfg)
+    sink = None
+    if overlay_output is not None:
+        observed = _LatestFrameSource(source)
+        source = observed
+        sink = _OverlaySink(observed, overlay_output)
+    return _build_pipeline(source, detector=detector, profiler=profiler, config=cfg, sink=sink)
 
 
 def _recording_path(config: Config) -> Path:
@@ -195,6 +234,26 @@ def _recording_path(config: Config) -> Path:
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     return config.paths.recordings_dir / f"live_{stamp}{config.acquisition.record_container}"
+
+
+def _first_live_frame(config: Config) -> Frame:
+    """Capture one live frame for manual calibration."""
+
+    from zero_ad_eyes.infrastructure.acquisition import ScreenCaptureSource
+
+    return next(ScreenCaptureSource.from_settings(config.acquisition, max_frames=1).frames())
+
+
+def _first_recorded_frame(recording: str, config: Config) -> Frame:
+    """Read one recording frame for manual calibration."""
+
+    return next(_offline_source(recording, config.acquisition).frames())
+
+
+def _overlay_recording_path(record_path: Path, config: Config) -> Path:
+    """Sibling path for an annotated video produced from the same live run."""
+
+    return record_path.with_name(f"{record_path.stem}_overlay{config.acquisition.record_container}")
 
 
 def _synthetic_source(n_frames: int, width: int, height: int) -> object:
@@ -452,7 +511,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zero-ad-eyes", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run = sub.add_parser("run", help="run the pipeline (classical detection by default)")
+    run = sub.add_parser("run", help="run the pipeline (model seam stub by default)")
     run.add_argument(
         "--frames",
         type=int,
@@ -464,7 +523,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     run.add_argument(
         "--recording",
         default=None,
-        help="path to a recording (image folder or video); drives the real classical chain",
+        help="path to a recording (image folder or video); drives the classical HUD/minimap chain",
     )
     run.add_argument(
         "--live",
@@ -478,10 +537,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         "(A5; codec cfg.acquisition.record_fourcc); requires --live",
     )
     run.add_argument(
+        "--overlay",
+        action="store_true",
+        help="show the annotated debug overlay while running live capture",
+    )
+    run.add_argument(
+        "--record-overlay",
+        action="store_true",
+        help="write an annotated overlay video next to the raw --record video",
+    )
+    run.add_argument(
+        "--overlay-output",
+        default=None,
+        help="path for the annotated overlay video (implies --record-overlay)",
+    )
+    run.add_argument(
         "--detector",
         choices=("classical", "stub"),
-        default="classical",
-        help="detection model behind the seam (v1 default: classical; stub = plumbing only)",
+        default="stub",
+        help=(
+            "main-viewport detector behind the model seam "
+            "(default: stub; classical = debug baseline)"
+        ),
     )
     run.add_argument(
         "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
@@ -502,8 +579,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ev.add_argument(
         "--detector",
         choices=("classical", "stub"),
-        default="classical",
-        help="detection model behind the seam for --recording (default: classical)",
+        default="stub",
+        help="main-viewport detector behind the model seam for --recording (default: stub)",
     )
     ev.add_argument(
         "--align-by",
@@ -527,9 +604,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench.add_argument("--height", type=int, default=720)
     bench.add_argument("--warmup", type=int, default=5)
     bench.add_argument(
-        "--recording", default=None, help="benchmark the real classical chain over a recording"
+        "--recording", default=None, help="benchmark the recording pipeline"
     )
-    bench.add_argument("--detector", choices=("classical", "stub"), default="classical")
+    bench.add_argument("--detector", choices=("classical", "stub"), default="stub")
     bench.add_argument(
         "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
     )
@@ -554,6 +631,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     cfg_validate.add_argument("path", help="the JSON config file to validate")
 
+    calibrate = sub.add_parser(
+        "calibrate", help="manually draw HUD boxes and save a calibration profile"
+    )
+    calibrate.add_argument(
+        "--recording",
+        default=None,
+        help="image folder or video to take the calibration frame from",
+    )
+    calibrate.add_argument(
+        "--live",
+        action="store_true",
+        help="capture one live frame to calibrate from",
+    )
+    calibrate.add_argument(
+        "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
+    )
+    calibrate.add_argument(
+        "--output-dir",
+        default=None,
+        help="directory for the saved profile (default: cfg.paths.calibration_dir)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "run":
@@ -561,16 +660,41 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error("choose one source: --live or --recording, not both")
         if args.record and not args.live:
             parser.error("--record requires --live (there is nothing to record otherwise)")
+        if args.overlay and not args.live:
+            parser.error("--overlay requires --live")
+        if (args.record_overlay or args.overlay_output is not None) and not args.record:
+            parser.error("--record-overlay/--overlay-output require --record")
         config = _load_config(args.config)
+        overlay_output = None
         if args.live:
             record_path = _recording_path(config) if args.record else None
             if record_path is not None:
                 print(f"recording live capture to {record_path}", file=sys.stderr)
+            if args.overlay or args.record_overlay or args.overlay_output is not None:
+                from zero_ad_eyes.interface.overlay import OverlayVideoSink
+
+                overlay_path = None
+                if args.record_overlay or args.overlay_output is not None:
+                    assert record_path is not None
+                    overlay_path = (
+                        Path(args.overlay_output)
+                        if args.overlay_output is not None
+                        else _overlay_recording_path(record_path, config)
+                    )
+                    print(f"recording overlay video to {overlay_path}", file=sys.stderr)
+                overlay_output = OverlayVideoSink(
+                    settings=config.overlay,
+                    video_path=overlay_path,
+                    fps=config.acquisition.live_fps,
+                    fourcc=config.acquisition.record_fourcc,
+                    show=args.overlay,
+                )
             pipeline = _build_live_pipeline(
                 detector=args.detector,
                 config=config,
                 max_frames=args.frames,
                 record_path=record_path,
+                overlay_output=overlay_output,
             )
         elif args.recording is not None:
             pipeline = _build_offline_pipeline(
@@ -584,8 +708,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 model,
                 recalibrate_interval=config.pipeline.recalibrate_interval,
             )
-        for world_model in pipeline.run():
-            print(world_model.model_dump_json())
+        try:
+            for world_model in pipeline.run():
+                print(world_model.model_dump_json())
+        finally:
+            if overlay_output is not None:
+                overlay_output.close()
         return 0
 
     if args.command == "eval":
@@ -617,6 +745,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             config=getattr(args, "config", None),
             force=getattr(args, "force", False),
         )
+
+    if args.command == "calibrate":
+        if args.live == (args.recording is not None):
+            parser.error("choose exactly one calibration source: --live or --recording PATH")
+        config = _load_config(args.config)
+        if args.live:
+            from zero_ad_eyes.infrastructure.acquisition import ScreenCaptureSource
+
+            source = ScreenCaptureSource.from_settings(config.acquisition)
+        else:
+            source = _offline_source(args.recording, config.acquisition)
+        from zero_ad_eyes.interface.manual_calibration import save_manual_calibration_from_source
+
+        output_dir = (
+            Path(args.output_dir) if args.output_dir is not None else config.paths.calibration_dir
+        )
+        path = save_manual_calibration_from_source(
+            source,
+            directory=output_dir,
+            theme=config.calibration.theme,
+        )
+        print(f"calibrate: wrote manual profile to {path}")
+        return 0
 
     parser.error(f"unknown command: {args.command}")
     return 2

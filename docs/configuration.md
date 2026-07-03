@@ -97,7 +97,7 @@ bool, `"--psm 6"` → string).
 | `thresholds` | NF3 accuracy targets (HUD error, mAP, ownership, MOTA) + eval IoU; the single home the ML8 harness derives from |
 | `paths` | recordings / calibration directories |
 | `overlay` | debug-overlay colours, fonts, sizes (X1) |
-| `perception` | ownership palette (E3), `ownership_min_fraction`, `detect_resources` + `resource_cues` (E6a), `health` (E4), `state` selection/construction/garrison cues (E5) |
+| `perception` | ownership palette (E3), `ownership_min_fraction`, optional debug `detect_resources` + `resource_cues` (legacy E6a), `health` (E4), `state` selection/construction/garrison cues (E5) |
 | `minimap` | palette (D2), `world_extent` (D6), `fog` (D4), `blips` (D2), `territory` (D3), `viewport` (D5), `disc_shape` (D1), `region_confidence` |
 | `hud` | top-bar + selection sub-region fractions (C1–C5), `ocr_config` (Tesseract mode) |
 | `tracking` | IoU tracker (`iou_threshold`, `min_hits`, `max_staleness`, `decay`) + event thresholds (`combat_drop`, `depletion_health`) |
@@ -172,9 +172,17 @@ save_config(default_config(), "my.json")  # then delete everything you don't wan
 
 - **Structural constants stay in code** (epsilons, the hue-179 OpenCV ceiling,
   minimum-size guards) — they are correctness invariants, not tuning knobs.
+- **CV/model split** is documented in [`vision-boundary.md`](./vision-boundary.md).
+  `run` defaults to `--detector stub`: HUD/minimap stay classical, while
+  main-viewport entity detections wait for the model adapter. `--detector classical`
+  and `perception.detect_resources` are debug fallbacks, not the production path.
 - **Live capture** (`acquisition.live_*`) drives `zero-ad-eyes run --live`, which builds a
   `ScreenCaptureSource.from_settings(cfg.acquisition)` into the same classical chain as
   `--recording` (needs a display + the `mss` backend to actually grab; `--frames` bounds it).
+  The same live source is used by `zero-ad-eyes calibrate --live`, which previews
+  continuous frames so you can freeze the moment you want before drawing each box.
+  For a quick smoke check, `zero-ad-eyes run --live --frames 1 --overlay` exercises the
+  real capture path and the overlay window on the current desktop session.
 - **Geometry / fusion** (`geometry.*`) drives the fusion stage (G4/G5): the pipeline folds
   minimap blips into the tracked entity set via `ClassicalEntityFuser.from_settings(cfg.geometry)`.
   Today it surfaces blips **outside the camera viewport** as their own world-space entities and

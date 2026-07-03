@@ -23,6 +23,7 @@ class Calibration(BaseModel):
     top_bar: ScreenBBox | None = None
     minimap: ScreenBBox | None = None
     selection_panel: ScreenBBox | None = None
+    hud_regions: dict[str, ScreenBBox] = Field(default_factory=dict)
 
 
 class CalibrationCheck(BaseModel):

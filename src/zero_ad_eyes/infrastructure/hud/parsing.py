@@ -80,8 +80,11 @@ def parse_population(text: str) -> tuple[int, int] | None:
 
     if not text:
         return None
-    cleaned = _GROUPING.sub("", _repair_glyphs(text))
-    match = _RATIO.search(cleaned)
+    repaired = _repair_glyphs(text)
+    match = _RATIO.search(repaired)
+    if match is None:
+        cleaned = _GROUPING.sub("", repaired)
+        match = _RATIO.search(cleaned)
     if match is None:
         return None
     return int(match.group(1)), int(match.group(2))

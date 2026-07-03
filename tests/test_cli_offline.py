@@ -1,4 +1,4 @@
-"""CLI offline wiring — the real classical chain runs over a recording (EPIC A→G)."""
+"""CLI offline wiring — HUD/minimap CV plus the model seam over a recording."""
 
 from __future__ import annotations
 
@@ -90,15 +90,16 @@ def test_print_report_measured_failure_is_fail_exit_one(
 # --- B3 disk calibration store wiring (opt-in via config) ------------------- #
 
 
-def test_persist_profiles_off_by_default_wires_no_store(tmp_path: Path) -> None:
+def test_persist_profiles_off_by_default_wires_readonly_store(tmp_path: Path) -> None:
     from zero_ad_eyes.infrastructure.calibration import HudCalibrator
 
     _write_recording(tmp_path)
     pipeline = _build_offline_pipeline(str(tmp_path), detector="classical")
 
-    # Default config has persist_profiles=False → no disk store, no CWD writes.
+    # Manual profiles are readable by default; automatic profile writes stay off.
     assert isinstance(pipeline._calibrator, HudCalibrator)
-    assert pipeline._calibrator._store is None
+    assert pipeline._calibrator._store is not None
+    assert pipeline._calibrator._save_profiles is False
 
 
 def test_persist_profiles_on_wires_store_at_configured_dir(tmp_path: Path) -> None:
@@ -129,3 +130,4 @@ def test_persist_profiles_on_wires_store_at_configured_dir(tmp_path: Path) -> No
     store = pipeline._calibrator._store
     assert isinstance(store, CalibrationProfileStore)
     assert store.directory == profiles
+    assert pipeline._calibrator._save_profiles is True

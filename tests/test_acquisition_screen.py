@@ -12,6 +12,9 @@ from zero_ad_eyes.infrastructure.acquisition.screen import (
     ScreenCaptureSource,
     _to_bgr,
 )
+from zero_ad_eyes.infrastructure.contract import InMemoryWorldModelSink
+from zero_ad_eyes.interface.cli import _build_pipeline
+from zero_ad_eyes.interface.default_config import default_config
 
 
 class FakeGrabber:
@@ -80,3 +83,24 @@ def test_real_mss_capture_smoke() -> None:
         pytest.skip(f"display present but capture unavailable: {exc}")
     assert len(frames) == 1
     assert frames[0].image.ndim == 3
+
+
+@pytest.mark.skipif(
+    not os.environ.get("DISPLAY"),
+    reason="no display: skip live pipeline smoke",
+)
+def test_live_pipeline_smoke() -> None:
+    cfg = default_config()
+    source = ScreenCaptureSource.from_settings(cfg.acquisition, max_frames=1)
+    sink = InMemoryWorldModelSink()
+    pipeline = _build_pipeline(source, config=cfg, sink=sink)
+
+    try:
+        results = list(pipeline.run())
+    except Exception as exc:  # noqa: BLE001 - display present can still reject capture
+        pytest.skip(f"display present but live pipeline capture unavailable: {exc}")
+
+    assert len(results) == 1
+    assert sink.latest is not None
+    assert sink.latest.meta.source == "live"
+    assert results[0].meta.source == "live"

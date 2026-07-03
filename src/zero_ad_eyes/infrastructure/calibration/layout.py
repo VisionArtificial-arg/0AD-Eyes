@@ -44,10 +44,12 @@ class HudCalibrator:
         ui_scale_min: float,
         ui_scale_max: float,
         store: CalibrationProfileStore | None = None,
+        save_profiles: bool = True,
     ) -> None:
         self._ratios = ratios
         self._theme = theme
         self._store = store
+        self._save_profiles = save_profiles
         self._use_anchors = use_anchors
         self._default_ui_scale = default_ui_scale
         self._ui_scale_min = ui_scale_min
@@ -63,6 +65,7 @@ class HudCalibrator:
             HudLayoutRatios.model_validate(settings.ratios.model_dump()),
             theme=settings.theme,
             store=store,
+            save_profiles=settings.persist_profiles,
             use_anchors=settings.use_anchors,
             default_ui_scale=settings.default_ui_scale,
             ui_scale_min=settings.ui_scale_min,
@@ -94,7 +97,7 @@ class HudCalibrator:
             selection_panel=self._ratios.selection_panel(width, height, ui_scale, bottom_anchor),
         )
 
-        if self._store is not None:
+        if self._store is not None and self._save_profiles:
             self._store.save(calibration, self._theme)
 
         return calibration

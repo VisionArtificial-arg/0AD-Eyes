@@ -117,7 +117,7 @@ def _perception_settings() -> PerceptionSettings:
             )
         ),
         ownership_min_fraction=0.02,
-        detect_resources=True,
+        detect_resources=False,
         resource_cues=DEFAULT_CUE_SETTINGS,
         health=HealthReadSettings(max_offset=20, s_min=60, v_min=60, min_run=0.15),
         state=StateCueSettings(
@@ -153,16 +153,16 @@ def test_default_cue_values_unchanged() -> None:
 
 def test_model_from_default_settings_matches_defaults() -> None:
     model = ClassicalPerceptionModel.from_settings(_perception_settings())
-    assert model._detect_resources is True
+    assert model._detect_resources is False
     assert model._resource_cues == DEFAULT_RESOURCE_CUES
 
 
 def test_config_file_threads_detect_resources_toggle(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
-    path.write_text('{"perception": {"detect_resources": false}}', encoding="utf-8")
+    path.write_text('{"perception": {"detect_resources": true}}', encoding="utf-8")
 
     config = load_config(default_config(), path, env={})
     model = ClassicalPerceptionModel.from_settings(config.perception)
 
-    assert model._detect_resources is False
+    assert model._detect_resources is True
     assert model._resource_cues == DEFAULT_RESOURCE_CUES  # cues untouched

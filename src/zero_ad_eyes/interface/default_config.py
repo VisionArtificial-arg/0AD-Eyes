@@ -136,7 +136,7 @@ def _default_perception() -> PerceptionSettings:
             )
         ),
         ownership_min_fraction=0.02,
-        detect_resources=True,
+        detect_resources=False,
         resource_cues=(
             ResourceCueSetting(
                 entity_type="tree",
@@ -283,8 +283,12 @@ def default_config() -> Config:
             live_fps=30.0,
             record_fourcc="FFV1",  # lossless: --record footage feeds #2 real-frame metrics
             record_container=".mkv",  # FFV1's native container; readable by VideoFileSource
-            capture_backend="mss",  # X11 default; set "wayland" on Wayland sessions
+            capture_backend="mss",  # X11 default; "wayland" (grim) or "portal" on Wayland
             wayland_capture_command=("grim", "-"),  # wlroots/Hyprland; overridable per machine
+            portal_source_type="window",  # portal backend: capture a specific window
+            portal_cursor="embedded",  # draw the cursor into the captured frame
+            portal_helper_python="/usr/bin/python",  # system interpreter w/ PyGObject+GStreamer
+            portal_restore_token_file="",  # "" = prompt each session (xdph v3 has no restore)
         ),
         geometry=GeometrySettings(
             camera_error_tolerance=1.0,

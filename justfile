@@ -21,25 +21,41 @@ fmt:
     uv run ruff format .
     uv run ruff check --fix .
 
-# Automated tests (T1-T3, T5-T6)
+# Automated tests (T1-T3, T5-T6; live smoke skips when capture is unavailable)
 test:
     uv run pytest
 
 # THE full CI action = check + test + accuracy eval. Green here => CI green.
 validate: check test eval
 
-# Accuracy-eval harness (ML8). Runs the real evaluate() harness; model-dependent
-# (🔌) metrics report pending-model until the real adapter lands (MP4). Pass a
-# dataset with `just eval --dataset PATH`. See REQUIREMENTS.md §5.10.4.
+# Accuracy-eval harness; model metrics report pending-model until MP4.
 eval *ARGS:
     uv run zero-ad-eyes eval {{ARGS}}
 
-# Launch the perception layer (synthetic source + stub model until adapters land)
+# Run the pipeline; defaults to HUD/minimap CV plus the model seam stub.
 run *ARGS:
     uv run zero-ad-eyes run {{ARGS}}
 
-# Perf benchmark (T6/NF1/NF2): latency percentiles + throughput. Provisional on the
-# stub/classical path; the real NF1 gate closes at MP4. Not in `validate` (timing
-# gates are machine-dependent); the harness logic is covered by pytest instead.
+# One-frame live smoke: exercises real capture + overlay without recording a long run.
+smoke-live CONFIG="config.json":
+    uv run zero-ad-eyes run --live --frames 1 --overlay --config {{CONFIG}}
+
+# Continuous live calibration. Freeze each requested frame, then draw the ROI.
+calibrate-live CONFIG="config.json":
+    uv run zero-ad-eyes calibrate --live --config {{CONFIG}}
+
+# Replay a recording through the default clean path: classical HUD/minimap + model seam stub.
+replay RECORDING CONFIG="config.json":
+    uv run zero-ad-eyes run --recording {{RECORDING}} --config {{CONFIG}}
+
+# Live demo artifact: raw recording + sibling overlay recording.
+record-live CONFIG="config.json":
+    uv run zero-ad-eyes run --live --record --record-overlay --config {{CONFIG}}
+
+# Opt-in debug path for the old noisy classical main-viewport detector.
+debug-classical RECORDING CONFIG="config.json":
+    uv run zero-ad-eyes run --recording {{RECORDING}} --config {{CONFIG}} --detector classical
+
+# Perf benchmark; provisional until MP4 and not part of validate.
 bench *ARGS:
     uv run zero-ad-eyes bench {{ARGS}}

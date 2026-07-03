@@ -19,6 +19,9 @@ def test_defaults_match_historical() -> None:
     assert (a.record_fourcc, a.record_container) == ("FFV1", ".mkv")
     assert a.capture_backend == "mss"
     assert a.wayland_capture_command == ("grim", "-")
+    assert (a.portal_source_type, a.portal_cursor) == ("window", "embedded")
+    assert a.portal_helper_python == "/usr/bin/python"
+    assert a.portal_restore_token_file == ""
 
 
 def test_config_file_threads_offline_fps(tmp_path: Path) -> None:
@@ -70,6 +73,23 @@ def test_record_path_wraps_live_source_in_video_recorder(tmp_path: Path) -> None
     assert pipeline._source.out_path == out
 
 
+def test_overlay_output_wraps_live_source_and_sink() -> None:
+    from zero_ad_eyes.interface.cli import _build_live_pipeline, _OverlaySink
+
+    class DummyOverlay:
+        def publish(self, _frame: object, _world_model: object) -> None:
+            pass
+
+    pipeline = _build_live_pipeline(
+        config=default_config(),
+        max_frames=2,
+        overlay_output=DummyOverlay(),
+    )
+
+    assert pipeline._source.__class__.__name__ == "_LatestFrameSource"
+    assert isinstance(pipeline._sink, _OverlaySink)
+
+
 def test_run_record_requires_live() -> None:
     # --record without --live is a usage error: there is no live source to record.
     import pytest
@@ -79,3 +99,33 @@ def test_run_record_requires_live() -> None:
     with pytest.raises(SystemExit) as exc:
         main(["run", "--record"])
     assert exc.value.code == 2  # argparse usage error
+
+
+def test_run_overlay_requires_live() -> None:
+    import pytest
+
+    from zero_ad_eyes.interface.cli import main
+
+    with pytest.raises(SystemExit) as exc:
+        main(["run", "--overlay"])
+    assert exc.value.code == 2
+
+
+def test_run_record_overlay_requires_record() -> None:
+    import pytest
+
+    from zero_ad_eyes.interface.cli import main
+
+    with pytest.raises(SystemExit) as exc:
+        main(["run", "--live", "--record-overlay"])
+    assert exc.value.code == 2
+
+
+def test_calibrate_requires_exactly_one_source() -> None:
+    import pytest
+
+    from zero_ad_eyes.interface.cli import main
+
+    with pytest.raises(SystemExit) as exc:
+        main(["calibrate"])
+    assert exc.value.code == 2

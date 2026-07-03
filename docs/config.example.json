@@ -162,7 +162,7 @@
       ]
     },
     "ownership_min_fraction": 0.02,
-    "detect_resources": true,
+    "detect_resources": false,
     "resource_cues": [
       {
         "entity_type": "tree",
@@ -468,7 +468,11 @@
     "wayland_capture_command": [
       "grim",
       "-"
-    ]
+    ],
+    "portal_source_type": "window",
+    "portal_cursor": "embedded",
+    "portal_helper_python": "/usr/bin/python",
+    "portal_restore_token_file": ""
   },
   "geometry": {
     "camera_error_tolerance": 1.0,

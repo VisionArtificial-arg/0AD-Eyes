@@ -19,7 +19,9 @@ Design notes:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from pathlib import Path
+from types import TracebackType
 from typing import Any
 
 from zero_ad_eyes.application.frames import Frame
@@ -32,6 +34,99 @@ from zero_ad_eyes.interface.default_config import default_config
 # A fog grid is a row-major 2-D grid of visibility states (§4.5). Kept as a plain
 # nested sequence so the overlay does not force a numpy shape on its callers.
 FogGrid = Sequence[Sequence[FogState]]
+
+
+class OverlayVideoSink:
+    """Writes and/or displays frames annotated with :func:`render`.
+
+    This is the runtime side of the overlay annotator: ``render`` remains pure and
+    headless-safe, while this class owns the OpenCV side effects used by the CLI.
+    The video writer opens lazily on the first frame because the frame supplies the
+    output dimensions.
+    """
+
+    def __init__(
+        self,
+        *,
+        settings: OverlaySettings,
+        video_path: str | Path | None = None,
+        fps: float = 30.0,
+        fourcc: str = "mp4v",
+        show: bool = False,
+        window_name: str = "0AD-Eyes overlay",
+        writer_factory: Callable[[str, int, float, tuple[int, int]], Any] | None = None,
+    ) -> None:
+        if fps <= 0.0:
+            raise ValueError("fps must be positive")
+        self._settings = settings
+        self._video_path = Path(video_path) if video_path is not None else None
+        self._fps = fps
+        self._fourcc = fourcc
+        self._show = show
+        self._window_name = window_name
+        self._writer_factory = writer_factory
+        self._writer: Any | None = None
+
+    @property
+    def video_path(self) -> Path | None:
+        return self._video_path
+
+    def publish(self, frame: Frame, world_model: WorldModel) -> None:
+        minimap = world_model.minimap
+        fog = minimap.fog.cells if minimap is not None and minimap.fog is not None else None
+        annotated = render(frame, world_model, settings=self._settings, fog=fog)
+        self._write(annotated)
+        self._display(annotated)
+
+    def _write(self, annotated: Any) -> None:
+        if self._video_path is None:
+            return
+        if self._writer is None:
+            import cv2
+
+            height, width = annotated.shape[:2]
+            self._video_path.parent.mkdir(parents=True, exist_ok=True)
+            fourcc = cv2.VideoWriter.fourcc(*self._fourcc)
+            factory = self._writer_factory
+            if factory is None:
+                factory = cv2.VideoWriter
+            self._writer = factory(str(self._video_path), fourcc, self._fps, (width, height))
+            if not self._writer.isOpened():
+                self._writer.release()
+                self._writer = None
+                raise OSError(
+                    f"cannot open overlay video writer for {self._video_path} "
+                    f"(codec {self._fourcc!r} unavailable?)"
+                )
+        self._writer.write(annotated)
+
+    def _display(self, annotated: Any) -> None:
+        if not self._show:
+            return
+        import cv2
+
+        cv2.imshow(self._window_name, annotated)
+        cv2.waitKey(1)
+
+    def close(self) -> None:
+        if self._writer is not None:
+            self._writer.release()
+            self._writer = None
+        if self._show:
+            import cv2
+
+            cv2.destroyWindow(self._window_name)
+
+    def __enter__(self) -> OverlayVideoSink:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self.close()
 
 
 def render(

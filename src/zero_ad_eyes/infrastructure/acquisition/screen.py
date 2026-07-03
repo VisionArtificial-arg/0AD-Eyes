@@ -161,12 +161,18 @@ class ScreenCaptureSource:
         the run-control / test seams (``grabber``, ``max_frames``) are supplied by the
         composition root, since they are not tuning defaults. The grabber is chosen by
         ``capture_backend``: the default ``mss`` (X11) is built lazily in ``__init__``;
-        ``wayland`` builds a :class:`WaylandGrabber` from ``wayland_capture_command``.
-        An explicitly injected ``grabber`` overrides the backend selection (tests).
+        ``wayland`` builds a :class:`WaylandGrabber` from ``wayland_capture_command``;
+        ``portal`` builds a ``PortalPipeWireGrabber`` (window/screen capture via
+        xdg-desktop-portal + PipeWire). An explicitly injected ``grabber`` overrides
+        the backend selection (tests).
         """
 
         if grabber is None and settings.capture_backend == "wayland":
             grabber = WaylandGrabber(settings.wayland_capture_command, region)
+        elif grabber is None and settings.capture_backend == "portal":
+            from .portal import PortalPipeWireGrabber
+
+            grabber = PortalPipeWireGrabber.from_settings(settings, region)
         return cls(
             monitor=settings.live_monitor,
             target_fps=settings.live_fps,

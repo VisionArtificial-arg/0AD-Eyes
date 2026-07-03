@@ -24,7 +24,7 @@ Snapshot of what is built. Checkboxes below are kept in sync with this table.
 | Area | State |
 |------|-------|
 | A Acquisition · P Preprocessing · B Calibration · C HUD · D Minimap | **Done** |
-| E main-viewport **classical** (E3/E4/E5/E6a/E7/E10/E11) | **Done** |
+| E main-viewport **classical enrichment** (E3/E4/E5/E7/E10) | **Done**; scene detection is model-owned |
 | E main-viewport **learned** (E1/E2/E6b/E8/E9) | **🔌 blocked on model team (MP4)** |
 | F Geometry · G Tracking/Fusion/Motion/Events/Spatial · H Contract | **Done** |
 | Model seam MP1–MP3, MP5 (port + stub + parity) | **Done**; **MP4** 🔌 |
@@ -44,21 +44,20 @@ Snapshot of what is built. Checkboxes below are kept in sync with this table.
   eventual target.
 - **Onion fix:** config value-object *types* live in `application.settings`; the
   JSON/env loader stays in `infrastructure.config` (no interface→infra sideways dep).
-- **CLI:** `zero-ad-eyes run` drives the full classical chain; `--recording PATH`
-  runs it over real frames. The detection model defaults to **`classical`** (the
-  E6a/E11 baseline); `--detector stub` is plumbing-only.
+- **CLI:** `zero-ad-eyes run` drives the classical HUD/minimap chain; `--recording PATH`
+  runs it over real frames. Main-viewport detection defaults to **`stub`** until the
+  model-team adapter lands; `--detector classical` is a noisy debug baseline only.
 - **Gate/DX:** `just eval` runs the real harness; `just bench` (T6/NF6); git hooks
   (`pre-commit=check`, `pre-push=validate`) + `just setup`.
 
-**Strategic decision (2026-07-02): v1 ships on the classical path; the learned model
-is a later drop-in upgrade, not a blocker.** No team is building the learned detector,
-so it is demoted from a gating dependency to an optional quality upgrade behind the
-`PerceptionModel` port. Consequences: v1 taxonomy is **coarse** (A3/OQ-4 revised); the
-**MP2 contract is provisional on model-internal fields** (input tensor spec `None`
-until a model exists — see §5.10.2); the shipped default detector is **classical**.
+**Strategic decision (2026-07-03): v1 ships with classical HUD/minimap plus a model
+port for main-viewport perception.** Another team owns the learned detector, so this
+repo keeps the `PerceptionModel` contract stable and defaults that detector to the
+stub until MP4 lands. Consequences: HUD/minimap/calibration are demonstrable now;
+main-scene detection/classification/segmentation are model-owned.
 
-**Reached:** M0–M2, **M3-scaffold** (= the classical v1), M4, M5, and the non-🔌 parts
-of M6. **DoD-A (classical v1)** is met except T4/T6. **DoD-B (with the learned model)**
+**Reached:** M0–M2, **M3-scaffold** (= model port plus classical HUD/minimap), M4,
+M5, and the non-🔌 parts of M6. **DoD-A** is met except T4/T6. **DoD-B (with the learned model)**
 is the later upgrade — open on the model artifact (MP4) and the NF1/NF3 gates it unblocks.
 
 ---
@@ -242,17 +241,18 @@ perception epic consumes the preprocessed frame, not the raw capture.
 - [x] **D6** Minimap-pixel → world-coordinate calibration.
 
 ### EPIC E — Main-Viewport Perception `[M]`
-Primary strategy is **learned segmentation/detection**; classical methods
-(template matching, contours) are baselines and fallbacks for fixed/known art.
+Primary strategy is **learned segmentation/detection**. Classical code in this
+epic enriches detections produced by the model; the old template/resource detectors
+are retained only as debug baselines.
 - [ ] 🔌 **E1** Entity **detection** + **localization** in the 3D scene (CV-10/CV-11).
 - [ ] 🔌 **E2** Entity **classification** into the taxonomy (§4.3), extensible (CV-14).
 - [x] **E3** **Ownership** assignment via player-color segmentation, robust to
       lighting/terrain/shadow and to color-blind palettes. *(classical — not model-dep)*
 - [x] **E4** Health-bar reading → health fraction. *(classical — not model-dep)*
 - [x] **E5** State cues: selection ring, construction scaffold, garrison, rank `[S]`.
-- [x] **E6a** On-map resource-node detection — **classical baseline** (template
-      match on fixed resource art + color/contour cues for trees/mines/bushes/fauna).
-      Coarse recall, works **without the model**. *(not model-dep)*
+- [x] **E6a** On-map resource-node detection — **legacy classical debug baseline**
+      (template match on fixed resource art + color/contour cues). Disabled by default;
+      production resource-node detection belongs to the model.
 - [ ] 🔌 **E6b** Resource-node detection — **learned refinement** via the model
       (better recall/precision in cluttered 3D scenes, exact sub-type). Supersedes
       E6a where confident; falls back to E6a otherwise.
@@ -371,8 +371,7 @@ rest of the layer now**, then swap the real model in with zero downstream change
   *scaffolding* of M4–M6 do not depend on the model.
 - **Not model-dep (build now):** acquisition (A), preprocessing (P), calibration (B),
   HUD/OCR (C — OCR uses off-the-shelf Tesseract, *not* the team's model),
-  minimap (D), ownership/health/state (E3/E4/E5), classical resource baseline (E6a),
-  template/classical path (E7/E10/E11),
+  minimap (D), ownership/health/state enrichment (E3/E4/E5), geometry helpers (E7/E10),
   geometry (F), tracking/motion/temporal/events/world-model (G), contract (H),
   tooling (X). All of these consume perception results **through the port**, never
   the model directly.
@@ -399,9 +398,9 @@ a model, a framework, or weights.
         came from the stub or the real adapter. Resource-node items are the driving
         case; the field is generic, not resource-specific.
 - [x] **MP3** Ship a **stub adapter** implementing the port without a real model:
-      (a) *fixture mode* — replays hand-labeled/engine-ground-truth (D6) detections
-      for recorded frames; (b) *classical mode* — the E11 template/contour path for
-      the subset it can cover. Lets G/H/X run end-to-end today.
+      fixture mode replays hand-labeled/engine-ground-truth (D6) detections for
+      recorded frames; empty mode proves G/H/X without fabricating main-scene
+      detections. The classical detector remains separate as an explicit debug option.
 - [ ] **MP4** Ship the **real adapter** (loads the delivered artifact, e.g. ONNX
       via onnxruntime) — the *only* new code needed at plug-in time.
 - [x] **MP5** Adapter-parity tests: same port contract satisfied by stub and real
@@ -511,7 +510,12 @@ always the locked one.
 | `just test` | Automated tests: T1–T3, T5 (deterministic + integration). | `pytest` |
 | `just eval` | ML8 accuracy harness; 🔌 metrics report `pending-model`, else score a `--dataset`. | `uv run zero-ad-eyes eval` |
 | `just validate` | **The full CI action** = `check` + `test` + `eval`. Green ⇒ CI green. | composition of the above |
-| `just run` | Run the pipeline; `--recording PATH` drives the real classical chain (X1 overlay / live source once a display is available). | `uv run zero-ad-eyes run …` |
+| `just run` | Raw passthrough to the pipeline; defaults to the model seam stub. | `uv run zero-ad-eyes run …` |
+| `just smoke-live` | One-frame live capture + overlay smoke on the current display. | `uv run zero-ad-eyes run --live --frames 1 --overlay …` |
+| `just calibrate-live` | Continuous-frame manual calibration from the live display. | `uv run zero-ad-eyes calibrate --live …` |
+| `just record-live` | Live raw recording + sibling overlay recording for demos. | `uv run zero-ad-eyes run --live --record --record-overlay …` |
+| `just replay PATH` | Replay a recording through classical HUD/minimap plus the model seam stub. | `uv run zero-ad-eyes run --recording PATH …` |
+| `just debug-classical PATH` | Opt-in legacy classical main-viewport detector for debugging only. | `uv run zero-ad-eyes run --detector classical …` |
 | `just bench` | Perf harness (T6): latency percentiles + throughput + per-stage NF6 timing. Provisional on stub; not in `validate`. | `uv run zero-ad-eyes bench …` |
 | `just fmt` / `just setup` | Auto-format + apply safe fixes / activate committed git hooks + `uv sync`. | `ruff` / `git config core.hooksPath` |
 
@@ -540,10 +544,10 @@ always the locked one.
    (EPIC B+C), classical/template path (CV-07/08/09).
 3. **M2 Minimap:** blips, fog, territory, viewport rect (EPIC D).
 4. **M3 Entities:** split by the model boundary —
-   - **M3-scaffold = the classical v1 `[this team, shipped]`:** model port + stub +
-     classical detection baseline (MP1–MP3, E6a/E11), ownership/health/state
-     (E3/E4/E5/E7/E10), camera geometry (F). Perceives end-to-end from pixels today;
-     this is what v1 ships on (2026-07 decision).
+   - **M3-scaffold `[this team, shipped]`:** model port + stub (MP1–MP3),
+     classical HUD/minimap, ownership/health/state enrichment (E3/E4/E5/E7/E10),
+     and camera geometry (F). It runs end-to-end today without claiming robust
+     main-scene detections.
    - **M3-live = optional later upgrade `[🔌 needs a learned model]`:** real
      detection/classification/segmentation (E1/E2/E6b/E8/E9) via the real adapter
      (MP4). A quality upgrade behind the same port, **not** a gate on v1.
@@ -618,8 +622,7 @@ always the locked one.
   (in-process object vs local socket vs shared memory). Schema stays
   transport-agnostic (§4.7) until then.
 - **OQ-4 — REVISED (2026-07):** **v1 = coarse `EntityKind`;** exact multi-civ types
-  deferred to the learned model as a later additive extension (A3). Originally
-  "resolved: exact types", re-scoped once it was decided no model team is building
-  the learned detector and v1 ships on the classical path.
+  are deferred to the learned model adapter (A3). This repo keeps the contract and
+  downstream pipeline ready while the model team owns detector training.
 - **OQ-5 — RESOLVED:** single-player, own-POV only (A6); enemy/fog-hidden state is
   unobservable by construction.

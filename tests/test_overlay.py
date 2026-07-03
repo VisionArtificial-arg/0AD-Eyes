@@ -6,6 +6,8 @@ Every test renders onto a synthetic black frame and asserts on shape/dtype and o
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from zero_ad_eyes.domain.confidence import Confidence
@@ -15,7 +17,8 @@ from zero_ad_eyes.domain.hud import HudState, Population
 from zero_ad_eyes.domain.minimap import Blip, FogState, MinimapModel, ViewportQuad
 from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership, Phase, ResourceType
 from zero_ad_eyes.domain.world_model import WorldModel
-from zero_ad_eyes.interface.overlay import render
+from zero_ad_eyes.interface.default_config import default_config
+from zero_ad_eyes.interface.overlay import OverlayVideoSink, render
 
 from .conftest import make_frame
 
@@ -153,3 +156,56 @@ def test_fog_grid_is_drawn() -> None:
     with_fog = render(frame, wm, fog=fog)
 
     assert _changed(with_fog, without_fog)
+
+
+class _FakeWriter:
+    def __init__(self) -> None:
+        self.frames: list[np.ndarray] = []
+        self.released = False
+
+    def isOpened(self) -> bool:  # noqa: N802 - mirrors cv2
+        return True
+
+    def write(self, image: np.ndarray) -> None:
+        self.frames.append(image.copy())
+
+    def release(self) -> None:
+        self.released = True
+
+
+def test_overlay_video_sink_writes_annotated_frames(tmp_path: Path) -> None:
+    writer = _FakeWriter()
+    calls: list[tuple[str, int, float, tuple[int, int]]] = []
+
+    def factory(path: str, fourcc: int, fps: float, size: tuple[int, int]) -> _FakeWriter:
+        calls.append((path, fourcc, fps, size))
+        return writer
+
+    frame = make_frame(width=200, height=150)
+    wm = WorldModel(
+        meta=frame.meta,
+        entities=(
+            Entity(
+                entity_id=1,
+                kind=EntityKind.UNIT,
+                ownership=Ownership.SELF,
+                screen_bbox=ScreenBBox(x=20, y=20, width=30, height=30),
+            ),
+        ),
+    )
+
+    sink = OverlayVideoSink(
+        settings=default_config().overlay,
+        video_path=tmp_path / "overlay.avi",
+        fps=12.0,
+        fourcc="MJPG",
+        writer_factory=factory,
+    )
+    sink.publish(frame, wm)
+    sink.close()
+
+    assert calls[0][0].endswith("overlay.avi")
+    assert calls[0][2:] == (12.0, (200, 150))
+    assert len(writer.frames) == 1
+    assert _changed(writer.frames[0], frame.image)
+    assert writer.released

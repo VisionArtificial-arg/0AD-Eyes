@@ -6,6 +6,9 @@ structured **world model** and hands it to a separate decision layer.
 
 See [`REQUIREMENTS.md`](./REQUIREMENTS.md) for the full requirements, the CV
 technique catalog, the model plug-and-play boundary, and the deliverable pipeline.
+See [`docs/vision-boundary.md`](./docs/vision-boundary.md) for the current split:
+traditional CV owns HUD/minimap/calibration/enrichment; the learned model owns
+main-viewport detection/classification/segmentation.
 
 ## Architecture (onion)
 
@@ -18,7 +21,8 @@ infrastructure/    adapters: capture, preprocessing, perception, model stub/real
 
 The **domain** core and the **ports** are committed first; every adapter is built
 and tested against them. The trained model plugs in behind the `PerceptionModel`
-port (see `REQUIREMENTS.md` §5.10) — production is **vision-only**.
+port (see `REQUIREMENTS.md` §5.10). Until that adapter lands, `run` defaults to the
+stub detector: HUD/minimap are classical, while main-viewport detections are empty.
 
 ## Developing
 
@@ -27,11 +31,13 @@ uv sync            # create the locked environment
 just check         # lint + format-check + type-check
 just test          # automated tests
 just validate      # the full CI action (check + test + eval)
-just run           # launch the perception layer + overlay
+just smoke-live    # one-frame live capture + overlay smoke
+just record-live   # live raw recording + sibling overlay recording
+just replay PATH   # replay a recording through HUD/minimap + model seam stub
 ```
 
-Live screen capture needs an X display; live OCR needs the system `tesseract`
-binary. Offline (recordings/fixtures) runs without either.
+Live capture, live calibration, and live OCR need a real display plus the system
+`tesseract` binary. Offline (recordings/fixtures) runs without either.
 
 ## Configuration
 

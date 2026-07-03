@@ -13,6 +13,7 @@ from zero_ad_eyes.application.frames import Frame
 
 from .backpressure import BoundedFrameBuffer, ThreadedFrameSource
 from .offline import ImageFolderSource, RecordedVideoSource, VideoFileSource
+from .portal import PortalPipeWireGrabber, read_frame
 from .recorder import FrameRecorder
 from .recording import FrameStamp, RecordingManifest
 from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource, WaylandGrabber
@@ -40,9 +41,11 @@ __all__ = [
     "ImageFolderSource",
     "InMemoryFrameSource",
     "MssGrabber",
+    "PortalPipeWireGrabber",
     "RecordedVideoSource",
     "RecordingManifest",
     "ScreenCaptureSource",
+    "read_frame",
     "ThreadedFrameSource",
     "Tick",
     "VideoFileSource",
