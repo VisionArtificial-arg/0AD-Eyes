@@ -117,6 +117,71 @@ class WaylandGrabber:
         return result.stdout
 
 
+WindowLocator = Callable[[str], CaptureRegion]
+
+
+class WindowRegionGrabber:
+    """``Grabber`` that captures a single named window on Windows.
+
+    Locates the window by a title substring on every grab (so it tracks the window
+    as it is moved or resized), computes the client-area rectangle in screen pixels,
+    and grabs exactly that region with ``mss``. Scraping the composited desktop
+    region — rather than asking the window to paint itself via ``PrintWindow``/BitBlt
+    — is what makes this work for OpenGL games like 0 A.D., which otherwise hand back
+    black frames. The window must be visible and un-occluded; that is the accepted
+    limitation of a screen scrape.
+
+    The title→region lookup is injected (default: a ``win32gui`` client-rect probe)
+    so the capture path stays unit-testable without ``pywin32`` or a display.
+    """
+
+    def __init__(self, window_title: str, *, locate: WindowLocator | None = None) -> None:
+        if not window_title:
+            raise ValueError("window_title must not be empty")
+        self._title = window_title
+        self._locate = locate if locate is not None else _win32_client_region
+        self._sct: Any | None = None
+
+    def _ensure_open(self) -> Any:
+        if self._sct is None:
+            import mss
+
+            self._sct = mss.MSS()
+        return self._sct
+
+    def grab(self) -> RawImage:
+        region = self._locate(self._title)
+        sct = self._ensure_open()
+        return np.asarray(sct.grab(region.as_mss()))
+
+    def close(self) -> None:
+        if self._sct is not None:
+            self._sct.close()
+            self._sct = None
+
+
+def _win32_client_region(title_substr: str) -> CaptureRegion:
+    """Locate a visible top-level window whose title contains ``title_substr`` and
+    return its client area as a screen-pixel :class:`CaptureRegion` (Windows only)."""
+
+    import win32gui
+
+    matches: list[int] = []
+
+    def _collect(hwnd: int, _: Any) -> None:
+        if win32gui.IsWindowVisible(hwnd) and title_substr in win32gui.GetWindowText(hwnd):
+            matches.append(hwnd)
+
+    win32gui.EnumWindows(_collect, None)
+    if not matches:
+        raise OSError(f"no visible window with title containing {title_substr!r}")
+    hwnd = matches[0]
+    left, top, right, bottom = win32gui.GetClientRect(hwnd)
+    sx, sy = win32gui.ClientToScreen(hwnd, (left, top))
+    ex, ey = win32gui.ClientToScreen(hwnd, (right, bottom))
+    return CaptureRegion(top=sy, left=sx, width=ex - sx, height=ey - sy)
+
+
 def _to_bgr(raw: RawImage) -> RawImage:
     """Normalise a raw grab to 3-channel BGR (``mss`` yields BGRA)."""
 
@@ -169,6 +234,8 @@ class ScreenCaptureSource:
 
         if grabber is None and settings.capture_backend == "wayland":
             grabber = WaylandGrabber(settings.wayland_capture_command, region)
+        elif grabber is None and settings.capture_backend == "window":
+            grabber = WindowRegionGrabber(settings.window_title)
         elif grabber is None and settings.capture_backend == "portal":
             from .portal import PortalPipeWireGrabber
 

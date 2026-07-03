@@ -64,6 +64,33 @@ Notes:
 - Live capture / HUD-OCR additionally need a display and the system `tesseract` binary
   (on Wayland, capture uses `grim`); offline `--recording` runs need neither.
 
+### Windows: capture just the game window
+
+The default backend (`mss`) grabs a whole monitor. To capture **only the 0 A.D.
+window** on Windows, use the `window` backend: it locates the window by a title
+substring every frame (so it follows moves/resizes) and scrapes its client area —
+which works on 0 A.D.'s OpenGL surface where `PrintWindow`/BitBlt return black frames.
+
+```bash
+uv sync --extra gpu                 # torch (CUDA); auto-uses the GPU
+uv pip install pywin32              # only the window backend needs this (Windows-only)
+
+# run live, capturing just the 0 A.D. window, with the learned detector:
+uv run --extra gpu zero-ad-eyes run --live --detector learned \
+    --config docs/config.windows.json --record
+```
+
+`docs/config.windows.json` just flips two keys (everything else keeps its default):
+
+```json
+{ "acquisition": { "capture_backend": "window", "window_title": "0 A.D." } }
+```
+
+`window_title` is a **substring** of the window title — edit it if your build titles
+the window differently. The window must be **visible / not occluded** (it is a screen
+scrape). Equivalent env override, no file needed:
+`set ZAE_ACQUISITION__CAPTURE_BACKEND=window` and `set ZAE_ACQUISITION__WINDOW_TITLE=0 A.D.`.
+
 ## Developing
 
 ```bash

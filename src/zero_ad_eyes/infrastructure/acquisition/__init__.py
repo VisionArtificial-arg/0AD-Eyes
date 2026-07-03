@@ -16,7 +16,14 @@ from .offline import ImageFolderSource, RecordedVideoSource, VideoFileSource
 from .portal import PortalPipeWireGrabber, read_frame
 from .recorder import FrameRecorder
 from .recording import FrameStamp, RecordingManifest
-from .screen import CaptureRegion, Grabber, MssGrabber, ScreenCaptureSource, WaylandGrabber
+from .screen import (
+    CaptureRegion,
+    Grabber,
+    MssGrabber,
+    ScreenCaptureSource,
+    WaylandGrabber,
+    WindowRegionGrabber,
+)
 from .timing import FramePacer, Tick
 from .video_recorder import VideoFrameRecorder, VideoSink, VideoSinkFactory
 
@@ -53,4 +60,5 @@ __all__ = [
     "VideoSink",
     "VideoSinkFactory",
     "WaylandGrabber",
+    "WindowRegionGrabber",
 ]

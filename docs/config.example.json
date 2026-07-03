@@ -465,6 +465,7 @@
     "record_fourcc": "FFV1",
     "record_container": ".mkv",
     "capture_backend": "mss",
+    "window_title": "0 A.D.",
     "wayland_capture_command": [
       "grim",
       "-"

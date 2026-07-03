@@ -284,7 +284,8 @@ def default_config() -> Config:
             live_fps=30.0,
             record_fourcc="FFV1",  # lossless: --record footage feeds #2 real-frame metrics
             record_container=".mkv",  # FFV1's native container; readable by VideoFileSource
-            capture_backend="mss",  # X11 default; "wayland" (grim) or "portal" on Wayland
+            capture_backend="mss",  # X11 default; wayland/portal (Wayland) or window (Windows)
+            window_title="0 A.D.",  # capture_backend="window": substring of the game window title
             wayland_capture_command=("grim", "-"),  # wlroots/Hyprland; overridable per machine
             portal_source_type="window",  # portal backend: capture a specific window
             portal_cursor="embedded",  # draw the cursor into the captured frame

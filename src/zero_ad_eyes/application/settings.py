@@ -476,7 +476,11 @@ class AcquisitionSettings(BaseModel):
     live_fps: float = Field(gt=0.0)  # live-capture target pacing
     record_fourcc: str = Field(min_length=1)  # cv2 FOURCC for --record (e.g. "FFV1" lossless)
     record_container: str = Field(min_length=1)  # recording file suffix (e.g. ".mkv")
-    capture_backend: Literal["mss", "wayland", "portal"]  # X11/mss, grim, or portal+PipeWire
+    # X11/mss, grim, portal+PipeWire, or Windows named-window
+    capture_backend: Literal["mss", "wayland", "portal", "window"]
+    # substring of the target window's title, used when capture_backend="window" (Windows:
+    # locate the window each grab and scrape its client rect with mss; needs pywin32).
+    window_title: str = Field(min_length=1)
     # command that writes one encoded image to stdout, used when capture_backend="wayland"
     # (e.g. grim on wlroots/Hyprland: ("grim", "-")); ignored under the mss backend.
     wayland_capture_command: tuple[str, ...] = Field(min_length=1)
