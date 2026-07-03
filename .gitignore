@@ -16,7 +16,7 @@ build/
 
 # Models / data artifacts (delivered separately, not versioned here)
 *.onnx
-*.pt
+!*.pt
 *.pth
 /data/
 /recordings/
