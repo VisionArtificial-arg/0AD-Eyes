@@ -32,9 +32,13 @@ validate: check test eval
 eval *ARGS:
     uv run zero-ad-eyes eval {{ARGS}}
 
-# Run the pipeline; defaults to HUD/minimap CV plus the model seam stub.
+# Run the live production capture; writes raw video, overlay video, and world models.
 run *ARGS:
-    uv run zero-ad-eyes run {{ARGS}}
+    uv run zero-ad-eyes run --live --record --record-overlay {{ARGS}}
+
+# Run the pipeline and also mirror world models to stdout for debugging.
+run-stdout *ARGS:
+    uv run zero-ad-eyes run --stdout {{ARGS}}
 
 # One-frame live smoke: exercises real capture + overlay without recording a long run.
 smoke-live CONFIG="config.json":
@@ -44,7 +48,7 @@ smoke-live CONFIG="config.json":
 calibrate-live CONFIG="config.json":
     uv run zero-ad-eyes calibrate --live --config {{CONFIG}}
 
-# Replay a recording through the default clean path: classical HUD/minimap + model seam stub.
+# Replay a recording and write world models to JSONL.
 replay RECORDING CONFIG="config.json":
     uv run zero-ad-eyes run --recording {{RECORDING}} --config {{CONFIG}}
 

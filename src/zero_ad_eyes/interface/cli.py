@@ -178,6 +178,7 @@ def _build_offline_pipeline(
     detector: str = "stub",
     profiler: StageProfiler | None = None,
     config: Config | None = None,
+    sink: WorldModelSink | None = None,
 ) -> PerceptionPipeline:
     """The HUD/minimap classical chain over a recording (image folder or video)."""
 
@@ -187,6 +188,7 @@ def _build_offline_pipeline(
         detector=detector,
         profiler=profiler,
         config=cfg,
+        sink=sink,
     )
 
 
@@ -198,6 +200,7 @@ def _build_live_pipeline(
     max_frames: int | None = None,
     record_path: Path | None = None,
     overlay_output: Any | None = None,
+    sink: WorldModelSink | None = None,
 ) -> PerceptionPipeline:
     """The HUD/minimap classical chain over live screen capture (EPIC A1).
 
@@ -217,12 +220,24 @@ def _build_live_pipeline(
     source: FrameSource = ScreenCaptureSource.from_settings(cfg.acquisition, max_frames=max_frames)
     if record_path is not None:
         source = VideoFrameRecorder.from_settings(source, record_path, cfg.acquisition)
-    sink = None
+    output_sink = sink
     if overlay_output is not None:
         observed = _LatestFrameSource(source)
         source = observed
-        sink = _OverlaySink(observed, overlay_output)
-    return _build_pipeline(source, detector=detector, profiler=profiler, config=cfg, sink=sink)
+        overlay_sink = _OverlaySink(observed, overlay_output)
+        if output_sink is None:
+            output_sink = overlay_sink
+        else:
+            from zero_ad_eyes.infrastructure.contract import CompositeWorldModelSink
+
+            output_sink = CompositeWorldModelSink(output_sink, overlay_sink)
+    return _build_pipeline(
+        source,
+        detector=detector,
+        profiler=profiler,
+        config=cfg,
+        sink=output_sink,
+    )
 
 
 def _recording_path(config: Config) -> Path:
@@ -254,6 +269,13 @@ def _overlay_recording_path(record_path: Path, config: Config) -> Path:
     """Sibling path for an annotated video produced from the same live run."""
 
     return record_path.with_name(f"{record_path.stem}_overlay{config.acquisition.record_container}")
+
+
+def _world_model_output_path(config: Config) -> Path:
+    """Timestamped JSONL file for ``run`` output."""
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return config.paths.recordings_dir / f"world_models_{stamp}.jsonl"
 
 
 def _synthetic_source(n_frames: int, width: int, height: int) -> object:
@@ -552,6 +574,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="path for the annotated overlay video (implies --record-overlay)",
     )
     run.add_argument(
+        "--output",
+        default=None,
+        help="JSONL world-model output path (default: recordings/world_models_<timestamp>.jsonl)",
+    )
+    run.add_argument(
+        "--stdout",
+        action="store_true",
+        help="also write world models to stdout as JSON lines",
+    )
+    run.add_argument(
         "--detector",
         choices=("classical", "stub"),
         default="stub",
@@ -603,9 +635,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench.add_argument("--width", type=int, default=1280)
     bench.add_argument("--height", type=int, default=720)
     bench.add_argument("--warmup", type=int, default=5)
-    bench.add_argument(
-        "--recording", default=None, help="benchmark the recording pipeline"
-    )
+    bench.add_argument("--recording", default=None, help="benchmark the recording pipeline")
     bench.add_argument("--detector", choices=("classical", "stub"), default="stub")
     bench.add_argument(
         "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
@@ -666,6 +696,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error("--record-overlay/--overlay-output require --record")
         config = _load_config(args.config)
         overlay_output = None
+        closers: list[Any] = []
+        sinks: list[WorldModelSink] = []
+        from zero_ad_eyes.infrastructure.contract import (
+            CallbackWorldModelSink,
+            CompositeWorldModelSink,
+            JsonlFileWorldModelSink,
+        )
+
+        output_path = (
+            Path(args.output) if args.output is not None else _world_model_output_path(config)
+        )
+        output_sink = JsonlFileWorldModelSink(output_path)
+        closers.append(output_sink)
+        sinks.append(output_sink)
+        print(f"writing world models to {output_path}", file=sys.stderr)
+        if args.stdout:
+            sinks.append(CallbackWorldModelSink(lambda wm: print(wm.model_dump_json())))
+        world_model_sink: WorldModelSink = (
+            sinks[0] if len(sinks) == 1 else CompositeWorldModelSink(*sinks)
+        )
         if args.live:
             record_path = _recording_path(config) if args.record else None
             if record_path is not None:
@@ -695,10 +745,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 max_frames=args.frames,
                 record_path=record_path,
                 overlay_output=overlay_output,
+                sink=world_model_sink,
             )
         elif args.recording is not None:
             pipeline = _build_offline_pipeline(
-                args.recording, detector=args.detector, config=config
+                args.recording,
+                detector=args.detector,
+                config=config,
+                sink=world_model_sink,
             )
         else:
             source = _synthetic_source(args.frames, args.width, args.height)
@@ -707,13 +761,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source,  # type: ignore[arg-type]
                 model,
                 recalibrate_interval=config.pipeline.recalibrate_interval,
+                sink=world_model_sink,
             )
         try:
-            for world_model in pipeline.run():
-                print(world_model.model_dump_json())
+            for _world_model in pipeline.run():
+                pass
         finally:
             if overlay_output is not None:
                 overlay_output.close()
+            for closer in closers:
+                closer.close()
         return 0
 
     if args.command == "eval":

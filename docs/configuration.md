@@ -176,6 +176,9 @@ save_config(default_config(), "my.json")  # then delete everything you don't wan
   `run` defaults to `--detector stub`: HUD/minimap stay classical, while
   main-viewport entity detections wait for the model adapter. `--detector classical`
   and `perception.detect_resources` are debug fallbacks, not the production path.
+  World models are written to JSONL by default; `just run` also records the live
+  raw video and sibling overlay video. Use `--output PATH` to choose the world-model
+  file and `--stdout` to also mirror them to the terminal.
 - **Live capture** (`acquisition.live_*`) drives `zero-ad-eyes run --live`, which builds a
   `ScreenCaptureSource.from_settings(cfg.acquisition)` into the same classical chain as
   `--recording` (needs a display + the `mss` backend to actually grab; `--frames` bounds it).

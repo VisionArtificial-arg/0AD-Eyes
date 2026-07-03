@@ -31,13 +31,17 @@ uv sync            # create the locked environment
 just check         # lint + format-check + type-check
 just test          # automated tests
 just validate      # the full CI action (check + test + eval)
+just run           # live capture: write raw video, overlay video, and JSONL
+just run-stdout    # write JSONL and mirror world models to stdout
 just smoke-live    # one-frame live capture + overlay smoke
 just record-live   # live raw recording + sibling overlay recording
-just replay PATH   # replay a recording through HUD/minimap + model seam stub
+just replay PATH   # replay a recording and write world models to JSONL
 ```
 
 Live capture, live calibration, and live OCR need a real display plus the system
 `tesseract` binary. Offline (recordings/fixtures) runs without either.
+`run` writes live raw video, a sibling overlay video, and world models under
+`recordings/` by default; pass `--stdout` when you also want JSON lines in the terminal.
 
 ## Configuration
 

@@ -17,6 +17,7 @@ from zero_ad_eyes.domain.world_model import WorldModel
 from zero_ad_eyes.infrastructure.contract.serialization import WorldModelCodec
 from zero_ad_eyes.infrastructure.contract.sinks import (
     CallbackWorldModelSink,
+    CompositeWorldModelSink,
     InMemoryWorldModelSink,
     JsonlFileWorldModelSink,
 )
@@ -138,6 +139,17 @@ def test_callback_sink_forwards_each_publish() -> None:
         sink.publish(wm)
 
     assert seen == models
+
+
+def test_composite_sink_fans_out_to_each_sink() -> None:
+    left = InMemoryWorldModelSink()
+    right = InMemoryWorldModelSink()
+    model = rich_world_model()
+
+    CompositeWorldModelSink(left, right).publish(model)
+
+    assert left.latest == model
+    assert right.latest == model
 
 
 def test_jsonl_sink_writes_one_line_per_publish_and_reads_back(tmp_path: Path) -> None:

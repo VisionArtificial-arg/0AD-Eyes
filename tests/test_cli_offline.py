@@ -31,18 +31,40 @@ def test_build_offline_pipeline_wires_the_real_chain(tmp_path: Path) -> None:
     assert pipeline._fuser is not None
 
 
-def test_run_over_image_folder_emits_v0_2_world_models(
+def test_run_over_image_folder_writes_v0_2_world_models_to_jsonl(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _write_recording(tmp_path)
+    recording = tmp_path / "frames"
+    recording.mkdir()
+    _write_recording(recording)
+    output = tmp_path / "world.jsonl"
     try:
-        code = main(["run", "--recording", str(tmp_path)])
+        code = main(["run", "--recording", str(recording), "--output", str(output)])
     except Exception as exc:  # noqa: BLE001 — OCR/tesseract or codecs may be absent in CI
+        pytest.skip(f"offline chain needs an external dependency here: {exc}")
+
+    assert code == 0
+    captured = capsys.readouterr()
+    assert '"schema_version":"0.2.0"' not in captured.out
+    assert "writing world models to" in captured.err
+    assert '"schema_version":"0.2.0"' in output.read_text(encoding="utf-8")
+
+
+def test_run_stdout_is_opt_in(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    recording = tmp_path / "frames"
+    recording.mkdir()
+    _write_recording(recording)
+    output = tmp_path / "world.jsonl"
+
+    try:
+        code = main(["run", "--recording", str(recording), "--output", str(output), "--stdout"])
+    except Exception as exc:  # noqa: BLE001
         pytest.skip(f"offline chain needs an external dependency here: {exc}")
 
     assert code == 0
     out = capsys.readouterr().out
     assert '"schema_version":"0.2.0"' in out
+    assert '"schema_version":"0.2.0"' in output.read_text(encoding="utf-8")
 
 
 # --- eval verdict rendering + exit code (classical-only gate) --------------- #

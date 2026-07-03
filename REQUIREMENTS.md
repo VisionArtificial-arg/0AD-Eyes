@@ -510,11 +510,12 @@ always the locked one.
 | `just test` | Automated tests: T1–T3, T5 (deterministic + integration). | `pytest` |
 | `just eval` | ML8 accuracy harness; 🔌 metrics report `pending-model`, else score a `--dataset`. | `uv run zero-ad-eyes eval` |
 | `just validate` | **The full CI action** = `check` + `test` + `eval`. Green ⇒ CI green. | composition of the above |
-| `just run` | Raw passthrough to the pipeline; defaults to the model seam stub. | `uv run zero-ad-eyes run …` |
+| `just run` | Live production capture: raw video, sibling overlay video, and JSONL world-model output. | `uv run zero-ad-eyes run --live --record --record-overlay …` |
+| `just run-stdout` | Debug run that keeps JSONL file output and also mirrors world models to the terminal. | `uv run zero-ad-eyes run --stdout …` |
 | `just smoke-live` | One-frame live capture + overlay smoke on the current display. | `uv run zero-ad-eyes run --live --frames 1 --overlay …` |
 | `just calibrate-live` | Continuous-frame manual calibration from the live display. | `uv run zero-ad-eyes calibrate --live …` |
 | `just record-live` | Live raw recording + sibling overlay recording for demos. | `uv run zero-ad-eyes run --live --record --record-overlay …` |
-| `just replay PATH` | Replay a recording through classical HUD/minimap plus the model seam stub. | `uv run zero-ad-eyes run --recording PATH …` |
+| `just replay PATH` | Replay a recording through classical HUD/minimap plus the model seam stub; writes JSONL output. | `uv run zero-ad-eyes run --recording PATH …` |
 | `just debug-classical PATH` | Opt-in legacy classical main-viewport detector for debugging only. | `uv run zero-ad-eyes run --detector classical …` |
 | `just bench` | Perf harness (T6): latency percentiles + throughput + per-stage NF6 timing. Provisional on stub; not in `validate`. | `uv run zero-ad-eyes bench …` |
 | `just fmt` / `just setup` | Auto-format + apply safe fixes / activate committed git hooks + `uv sync`. | `ruff` / `git config core.hooksPath` |

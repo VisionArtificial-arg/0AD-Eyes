@@ -11,6 +11,8 @@ integration surface without committing to an IPC mechanism:
   line. The offline/decoupled consumer (and dataset replay) reads it back.
 - :class:`CallbackWorldModelSink` — adapts the port to any ``callable``, so wiring a
   socket/queue later (M5) is a one-liner, not a new class here.
+- :class:`CompositeWorldModelSink` — fan-out adapter for publishing to multiple
+  sinks without teaching the pipeline about any destination.
 
 None imports a socket or shared-memory primitive: the concrete IPC choice stays
 deferred (OQ-3). The port is structural, so these classes need no explicit base.
@@ -23,6 +25,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO
 
+from zero_ad_eyes.application.ports import WorldModelSink
 from zero_ad_eyes.domain.world_model import WorldModel
 
 from .serialization import WorldModelCodec
@@ -67,6 +70,7 @@ class JsonlFileWorldModelSink:
     ) -> None:
         self._path = Path(path)
         self._codec = codec or WorldModelCodec()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         self._file: IO[str] = self._path.open("a" if append else "w", encoding="utf-8")
 
     @property
@@ -105,3 +109,14 @@ class CallbackWorldModelSink:
 
     def publish(self, world_model: WorldModel) -> None:
         self._on_publish(world_model)
+
+
+class CompositeWorldModelSink:
+    """Publishes each world model to several sinks in order."""
+
+    def __init__(self, *sinks: WorldModelSink) -> None:
+        self._sinks = tuple(sinks)
+
+    def publish(self, world_model: WorldModel) -> None:
+        for sink in self._sinks:
+            sink.publish(world_model)

@@ -20,7 +20,12 @@ from __future__ import annotations
 from .cadence import OnChangeSink, PerFrameSink
 from .example_client import WorldModelReader
 from .serialization import WorldModelCodec
-from .sinks import CallbackWorldModelSink, InMemoryWorldModelSink, JsonlFileWorldModelSink
+from .sinks import (
+    CallbackWorldModelSink,
+    CompositeWorldModelSink,
+    InMemoryWorldModelSink,
+    JsonlFileWorldModelSink,
+)
 from .versioning import (
     CURRENT_SCHEMA_VERSION,
     IncompatibleSchemaError,
@@ -31,6 +36,7 @@ from .versioning import (
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "CallbackWorldModelSink",
+    "CompositeWorldModelSink",
     "IncompatibleSchemaError",
     "InMemoryWorldModelSink",
     "JsonlFileWorldModelSink",
