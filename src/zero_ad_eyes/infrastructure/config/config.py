@@ -34,7 +34,7 @@ def save_config(config: Config, path: str | os.PathLike[str]) -> None:
 
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(config.model_dump_json(indent=2), encoding="utf-8")
+    destination.write_text(config.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
 def load_config(
