@@ -42,6 +42,8 @@ Live capture, live calibration, and live OCR need a real display plus the system
 `tesseract` binary. Offline (recordings/fixtures) runs without either.
 `run` writes live raw video, a sibling overlay video, and world models under
 `recordings/` by default; pass `--stdout` when you also want JSON lines in the terminal.
+A live `run` with no `--frames` captures until you press `Ctrl-C`, which flushes the
+JSONL and finalizes the recording cleanly; pass `--frames N` to cap it instead.
 
 ## Configuration
 

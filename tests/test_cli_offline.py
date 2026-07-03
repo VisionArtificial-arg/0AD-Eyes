@@ -67,6 +67,44 @@ def test_run_stdout_is_opt_in(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert '"schema_version":"0.2.0"' in output.read_text(encoding="utf-8")
 
 
+def test_run_without_frames_stops_cleanly_on_keyboard_interrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # An unbounded run (no --frames) ends on Ctrl-C: the interrupt must unwind to a
+    # clean exit 0 with the sinks flushed, not surface as a traceback.
+    from collections.abc import Iterator
+
+    from zero_ad_eyes.application.pipeline import PerceptionPipeline
+    from zero_ad_eyes.domain.world_model import WorldModel
+
+    def _interrupt(self: PerceptionPipeline) -> Iterator[WorldModel]:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(PerceptionPipeline, "run", _interrupt)
+    output = tmp_path / "world.jsonl"
+
+    code = main(["run", "--output", str(output)])
+
+    assert code == 0
+    assert output.exists()  # the JSONL sink was created and closed cleanly
+    assert "stopping" in capsys.readouterr().err
+
+
+def test_run_synthetic_without_frames_defaults_to_three(tmp_path: Path) -> None:
+    # Omitting --frames means "unbounded" for --live, but the synthetic source has no
+    # display to stop it, so it falls back to a small fixed count.
+    output = tmp_path / "world.jsonl"
+    try:
+        code = main(["run", "--output", str(output)])
+    except Exception as exc:  # noqa: BLE001 — OCR/tesseract may be absent in CI
+        pytest.skip(f"synthetic chain needs an external dependency here: {exc}")
+
+    assert code == 0
+    assert len(output.read_text(encoding="utf-8").splitlines()) == 3
+
+
 # --- eval verdict rendering + exit code (classical-only gate) --------------- #
 
 

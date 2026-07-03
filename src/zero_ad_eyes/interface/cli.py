@@ -537,8 +537,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     run.add_argument(
         "--frames",
         type=int,
-        default=3,
-        help="frames to emit (synthetic source; also bounds --live so it terminates)",
+        default=None,
+        help="cap the number of frames; omit on --live to capture until Ctrl-C "
+        "(the synthetic source falls back to 3 frames when omitted)",
     )
     run.add_argument("--width", type=int, default=1280)
     run.add_argument("--height", type=int, default=720)
@@ -755,7 +756,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 sink=world_model_sink,
             )
         else:
-            source = _synthetic_source(args.frames, args.width, args.height)
+            n_frames = args.frames if args.frames is not None else 3
+            source = _synthetic_source(n_frames, args.width, args.height)
             model = _perception_model(args.detector, config)
             pipeline = PerceptionPipeline(
                 source,  # type: ignore[arg-type]
@@ -766,6 +768,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             for _world_model in pipeline.run():
                 pass
+        except KeyboardInterrupt:
+            # Unbounded --live runs until interrupted; unwinding the pipeline
+            # generator finalizes the recording (video + sidecar), then the
+            # finally below flushes the overlay and JSONL sinks. Exit cleanly.
+            print("stopping — finalizing capture…", file=sys.stderr)
         finally:
             if overlay_output is not None:
                 overlay_output.close()

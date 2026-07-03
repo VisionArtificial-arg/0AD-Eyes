@@ -181,7 +181,8 @@ save_config(default_config(), "my.json")  # then delete everything you don't wan
   file and `--stdout` to also mirror them to the terminal.
 - **Live capture** (`acquisition.live_*`) drives `zero-ad-eyes run --live`, which builds a
   `ScreenCaptureSource.from_settings(cfg.acquisition)` into the same classical chain as
-  `--recording` (needs a display + the `mss` backend to actually grab; `--frames` bounds it).
+  `--recording` (needs a display + the `mss` backend to actually grab; runs until `Ctrl-C`
+  unless `--frames N` caps it).
   The same live source is used by `zero-ad-eyes calibrate --live`, which previews
   continuous frames so you can freeze the moment you want before drawing each box.
   For a quick smoke check, `zero-ad-eyes run --live --frames 1 --overlay` exercises the
