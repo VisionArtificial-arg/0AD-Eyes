@@ -13,6 +13,19 @@ dependencies = [
     "pydantic>=2.6",
 ]
 
+[project.optional-dependencies]
+# The learned segmentation adapter (MP4). Optional so the core stays numpy+opencv;
+# install with `uv sync --extra learned`. CPU wheels only (see [tool.uv] below).
+learned = ["torch>=2.2"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [project.scripts]
 zero-ad-eyes = "zero_ad_eyes.interface.cli:main"
 

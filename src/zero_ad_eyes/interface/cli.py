@@ -80,6 +80,10 @@ def _perception_model(detector: str, config: Config) -> PerceptionModel:
         from zero_ad_eyes.infrastructure.perception import ClassicalPerceptionModel
 
         return ClassicalPerceptionModel.from_settings(config.perception)
+    if detector == "learned":
+        from zero_ad_eyes.infrastructure.model import SegmentationPerceptionModel
+
+        return SegmentationPerceptionModel.from_weights()
     return StubPerceptionModel()
 
 
@@ -586,7 +590,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     run.add_argument(
         "--detector",
-        choices=("classical", "stub"),
+        choices=("classical", "stub", "learned"),
         default="stub",
         help=(
             "main-viewport detector behind the model seam "
@@ -611,7 +615,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     ev.add_argument(
         "--detector",
-        choices=("classical", "stub"),
+        choices=("classical", "stub", "learned"),
         default="stub",
         help="main-viewport detector behind the model seam for --recording (default: stub)",
     )
@@ -637,7 +641,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench.add_argument("--height", type=int, default=720)
     bench.add_argument("--warmup", type=int, default=5)
     bench.add_argument("--recording", default=None, help="benchmark the recording pipeline")
-    bench.add_argument("--detector", choices=("classical", "stub"), default="stub")
+    bench.add_argument("--detector", choices=("classical", "stub", "learned"), default="stub")
     bench.add_argument(
         "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
     )
