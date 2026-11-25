@@ -536,6 +536,21 @@ class SegmentationModelSettings(BaseModel):
     min_region_area: int = Field(ge=0)
 
 
+class DatasetSettings(BaseModel):
+    """Engine-fork runs → YOLO-seg dataset (ENG-6). Offline tooling only."""
+
+    model_config = ConfigDict(frozen=True)
+
+    val_fraction: float = Field(ge=0.0, lt=1.0)  # share of *runs*, never frames
+    test_fraction: float = Field(ge=0.0, lt=1.0)
+    split_seed: int  # changes which runs land in which split
+    dedup_threshold: float = Field(ge=0.0)  # mean abs thumbnail diff (0–255) below = duplicate
+    dedup_thumbnail: int = Field(ge=4)  # thumbnail side, pixels
+    min_instance_pixels: int = Field(ge=1)  # smaller instances get no label
+    polygon_epsilon: float = Field(ge=0.0)  # cv2.approxPolyDP tolerance, pixels
+    image_variant: Literal["rgb", "rgb_nogui"]  # which frame image to train on
+
+
 class EventSettings(BaseModel):
     """Which event sources run (EVT-2). Each source adds its switch and thresholds here
     as it lands (EVT-3…EVT-6). Policy: events over silence, so every source defaults on
@@ -570,3 +585,4 @@ class Config(BaseModel):
     geometry: GeometrySettings
     segmentation: SegmentationModelSettings
     events: EventSettings
+    dataset: DatasetSettings

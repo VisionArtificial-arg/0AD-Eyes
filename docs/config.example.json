@@ -493,5 +493,15 @@
     "hud": true,
     "hud_min_resource_delta": 1,
     "hud_min_selection_health_delta": 0.01
+  },
+  "dataset": {
+    "val_fraction": 0.15,
+    "test_fraction": 0.15,
+    "split_seed": 0,
+    "dedup_threshold": 2.0,
+    "dedup_thumbnail": 32,
+    "min_instance_pixels": 12,
+    "polygon_epsilon": 1.0,
+    "image_variant": "rgb"
   }
 }

@@ -76,3 +76,23 @@ Its `docs/api_verificada.md` checks the Release 28 script APIs against the sourc
 The repo also has a split-by-match splitter and dedup code worth reusing in ENG-6. Its
 weaknesses: it has never run against the real game, box heights are placeholders, and it
 assumes flat maps.
+
+## From runs to a training set (ENG-6)
+
+```bash
+uv run zero-ad-eyes dataset build --input <dataset-root> --output data/yolo
+```
+
+- **Input:** every `<run_id>/` with a `run.json` under `<dataset-root>`.
+- **Output:** an Ultralytics YOLO-seg dataset: `images/` and `labels/` per split,
+  `data.yaml`, and `report.json` with runs, frames and instances per split and per
+  class.
+- **Splitting is by run (match), never by frame.** The assignment is deterministic
+  (`dataset.split_seed`), and val and test each get at least one run once there are
+  three or more.
+- **Near-duplicate frames inside a run are dropped,** using `dataset.dedup_threshold`
+  on 32 px grayscale thumbnails.
+- **Labels come from the instance masks:** one polygon per visible entity, over 7
+  classes (wood, stone, metal, food, fauna, building, unit).
+- **Settings:** all knobs are in the `dataset` config section.
+  `dataset.image_variant: rgb_nogui` trains on the GUI-off frames instead.

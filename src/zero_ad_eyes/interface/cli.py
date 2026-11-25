@@ -547,6 +547,24 @@ def _run_config(
     return 2
 
 
+def _run_dataset_build(input_dir: Path, output_dir: Path, config: Config) -> int:
+    """`dataset build`: write the YOLO-seg dataset and print its per-split summary."""
+
+    from zero_ad_eyes.infrastructure.data.engine_dataset import find_runs
+    from zero_ad_eyes.infrastructure.data.yolo_dataset import build_yolo_dataset
+
+    runs = find_runs(input_dir)
+    if not runs:
+        print(f"dataset build: no runs (dirs with run.json) under {input_dir}", file=sys.stderr)
+        return 1
+    report = build_yolo_dataset(runs, output_dir, config.dataset)
+    for split, part in report.splits.items():
+        print(f"{split}: {len(part.runs)} runs, {part.frames} frames, {part.instances} instances")
+    print(f"duplicates dropped: {report.duplicates_dropped}")
+    print(f"wrote {output_dir / 'data.yaml'}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zero-ad-eyes", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -679,6 +697,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate", help="validate a config file against the schema"
     )
     cfg_validate.add_argument("path", help="the JSON config file to validate")
+
+    dataset = sub.add_parser("dataset", help="offline dataset tooling (engine-fork runs)")
+    dataset_sub = dataset.add_subparsers(dest="dataset_command", required=True)
+    ds_build = dataset_sub.add_parser(
+        "build", help="engine-fork runs → YOLO-seg dataset, split by run (ENG-6)"
+    )
+    ds_build.add_argument("--input", required=True, help="dataset root holding <run_id>/ dirs")
+    ds_build.add_argument("--output", required=True, help="where to write the YOLO dataset")
+    ds_build.add_argument(
+        "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
+    )
 
     calibrate = sub.add_parser(
         "calibrate", help="manually draw HUD boxes and save a calibration profile"
@@ -827,6 +856,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             config=getattr(args, "config", None),
             force=getattr(args, "force", False),
         )
+
+    if args.command == "dataset":
+        return _run_dataset_build(Path(args.input), Path(args.output), _load_config(args.config))
 
     if args.command == "calibrate":
         if args.live == (args.recording is not None):

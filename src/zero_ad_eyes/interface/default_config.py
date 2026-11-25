@@ -20,6 +20,7 @@ from zero_ad_eyes.application.settings import (
     CalibrationSettings,
     Config,
     ConstructionCueSettings,
+    DatasetSettings,
     EventSettings,
     FogPalette,
     FogSettings,
@@ -313,5 +314,15 @@ def default_config() -> Config:
             hud=True,
             hud_min_resource_delta=1,  # every observable change (events over silence)
             hud_min_selection_health_delta=0.01,
+        ),
+        dataset=DatasetSettings(
+            val_fraction=0.15,
+            test_fraction=0.15,
+            split_seed=0,
+            dedup_threshold=2.0,  # near-identical frames (static camera) only
+            dedup_thumbnail=32,
+            min_instance_pixels=12,  # a few pixels is not a learnable object
+            polygon_epsilon=1.0,
+            image_variant="rgb",  # GUI on, like real play
         ),
     )
