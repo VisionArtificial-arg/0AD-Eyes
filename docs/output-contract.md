@@ -45,9 +45,23 @@ observe, each with a confidence, and the consumer decides what to ignore.
 | `screen_pos` | `{x, y}` \| null              | Full-capture pixels (an entity's box centre). |
 | `world_pos`  | `{x, y}` \| null              | World position; for a disappearance, where it was last seen. |
 
-Sources run in a fixed order, so a recording always yields the same event list: HUD,
-then minimap, then entity. Each can be switched off in the `events` config section. The catalogue
-below grows as each source lands (EVT-6 adds system events).
+Sources run in a fixed order, so a recording always yields the same event list: system,
+then HUD, then minimap, then entity. Each can be switched off in the `events` config section.
+
+#### System events (`origin: system`)
+
+The eyes reporting on their own health, so a consumer knows when to trust the rest of
+the stream less. Failures are reported when the state changes, not on every frame.
+
+| `kind` | `details` |
+| --- | --- |
+| `layout_drift` | none (the periodic self-check found the HUD layout moved) |
+| `recalibrated` | `width`, `height` (layout (re-)detected) |
+| `hud_read_failed` / `hud_read_restored` | `hud_present` on failure (no HUD values read) |
+| `hud_low_confidence` | `confidence` (fell below `events.system_low_confidence`) |
+| `minimap_read_failed` / `minimap_read_restored` | none |
+| `frames_dropped` | `missed`, `step`, `usual_step` (frame ids jumped by more than the usual step) |
+| `detections_stopped` / `detections_resumed` | `silent_frames` / `observed` (no observed entity for `events.system_silent_frames` frames) |
 
 #### HUD events (`origin: hud`)
 
