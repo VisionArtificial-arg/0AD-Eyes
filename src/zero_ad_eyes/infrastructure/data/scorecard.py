@@ -65,6 +65,7 @@ class DetectionScore(BaseModel):
 
 
 class Scorecard(BaseModel):
+    runs: int
     frames: int
     detection_coarse: DetectionScore
     detection_fine: DetectionScore
@@ -87,18 +88,29 @@ def score_run(
 ) -> Scorecard:
     """Score ``predicted`` against ``export``, pairing frames by ``frame_id``."""
 
-    aligner = GroundTruthAligner(export)
-    pairs: list[Pair] = []
-    for world_model in predicted:
-        engine_frame = aligner.frame_for_id(world_model.meta.frame_id)
-        if engine_frame is not None:
-            truth = aligner.labels_for(engine_frame, world_model.meta).world_model
-            pairs.append((world_model, truth, engine_frame))
+    return score_runs([(predicted, export)], iou_threshold=iou_threshold, blip_radius=blip_radius)
 
+
+def score_runs(
+    runs: Sequence[tuple[Sequence[WorldModel], EngineStateExport]],
+    *,
+    iou_threshold: float,
+    blip_radius: float,
+) -> Scorecard:
+    """Score several runs (e.g. every held-out match) into one scorecard.
+
+    Frames from all runs are pooled for detection, HUD, ownership, health and minimap.
+    MOTA is computed per run, because track ids don't carry across matches, then
+    weighted by each run's ground-truth count.
+    """
+
+    pairs_by_run = [_pairs(predicted, export) for predicted, export in runs]
+    pairs = [pair for run_pairs in pairs_by_run for pair in run_pairs]
     hud_exact, hud_error = _hud_scores(pairs)
     ownership, health = _entity_attribute_scores(pairs, iou_threshold)
     precision, recall = _minimap_scores(pairs, blip_radius)
     return Scorecard(
+        runs=len(runs),
         frames=len(pairs),
         detection_coarse=_detection_score(pairs, _coarse_truth, _coarse_pred),
         detection_fine=_detection_score(pairs, _fine_truth, _fine_pred),
@@ -106,9 +118,7 @@ def score_run(
         hud_mean_relative_error=hud_error,
         ownership_accuracy=ownership,
         health_mae=health,
-        tracking_mota=tracking_mota(
-            [p for p, _, _ in pairs], [t for _, t, _ in pairs], iou_threshold
-        ),
+        tracking_mota=_pooled_mota(pairs_by_run, iou_threshold),
         minimap_blip_precision=precision,
         minimap_blip_recall=recall,
         events_per_kind=dict(
@@ -146,8 +156,8 @@ def _detection_score(
 ) -> DetectionScore:
     truth: dict[str, dict[int, list[Detection]]] = {}
     preds: dict[str, list[tuple[int, Detection]]] = {}
-    for predicted, _, engine_frame in pairs:
-        frame_id = predicted.meta.frame_id
+    # Key frames by their position in the pooled list: frame ids repeat across runs.
+    for frame_id, (predicted, _, engine_frame) in enumerate(pairs):
         for gt in engine_frame.entities:
             if gt.bbox is not None:
                 truth.setdefault(truth_class(gt), {}).setdefault(frame_id, []).append(
@@ -275,3 +285,34 @@ def _minimap_scores(pairs: Sequence[Pair], radius: float) -> tuple[Rate, Rate]:
                 free.remove(best)
                 matched += 1
     return Rate.of(matched, predicted_n), Rate.of(matched, truth_n)
+
+
+# --------------------------------------------------------------------------- #
+# Pairing and MOTA                                                            #
+# --------------------------------------------------------------------------- #
+
+
+def _pairs(predicted: Sequence[WorldModel], export: EngineStateExport) -> list[Pair]:
+    aligner = GroundTruthAligner(export)
+    pairs: list[Pair] = []
+    for world_model in predicted:
+        engine_frame = aligner.frame_for_id(world_model.meta.frame_id)
+        if engine_frame is not None:
+            truth = aligner.labels_for(engine_frame, world_model.meta).world_model
+            pairs.append((world_model, truth, engine_frame))
+    return pairs
+
+
+def _pooled_mota(pairs_by_run: Sequence[Sequence[Pair]], iou_threshold: float) -> float | None:
+    errors = 0.0
+    total = 0
+    for run_pairs in pairs_by_run:
+        gt = sum(1 for _, t, _ in run_pairs for e in t.entities if e.screen_bbox is not None)
+        mota = tracking_mota(
+            [p for p, _, _ in run_pairs], [t for _, t, _ in run_pairs], iou_threshold
+        )
+        if mota is None or gt == 0:
+            continue
+        errors += (1.0 - mota) * gt
+        total += gt
+    return 1.0 - errors / total if total else None
