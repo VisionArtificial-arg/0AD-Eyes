@@ -84,7 +84,7 @@ colours that line up with the RGB.
 ## 7. Claude Code
 
 Install Claude Code on the PC, then start it in `~/dev/va-final/0AD-Eyes`. It picks up
-`CLAUDE.md`, which points to this file and to `docs/ROADMAP.md`.
+`CLAUDE.md`, which points to this file and to the roadmap in GitHub issues.
 
-Suggested first prompt: *"We're in W0 of docs/ROADMAP.md. Walk me through
-docs/pc-setup.md, then do ENG-0."*
+Suggested first prompt: *"We're in milestone W0 Spike. Walk me through
+docs/pc-setup.md (CAP-1), then do ENG-0."*

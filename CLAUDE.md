@@ -23,9 +23,15 @@ The student works solo, and the CV quality is what gets graded.
 
 ## Where things stand
 
-The plan is `docs/ROADMAP.md`: waves, lanes, stories and gates. Read it at the start of
-every session to find the current wave and its open stories. Tick stories off there as
-they close.
+The plan lives in GitHub issues on `VisionArtificial-arg/0AD-Eyes`:
+- **Milestones = waves** (W0–W5). Each one's gate is in its description.
+- **Epics** are labelled `epic` (`[ENG]`, `[MOD]`, `[EVT]`, `[CAP]`, `[EVAL]`, `[PRES]`), and their stories are sub-issues titled `[ENG-1] …`.
+- **Labels** mark the lane, `owner: you` / `owner: agent`, `optional` and `fallback`.
+- **The pinned issue #42** `Roadmap to the final` (label `roadmap`) holds the critical path and the cut order.
+
+At the start of every session, find the current wave with
+`gh issue list --milestone "<wave title>"` and read the pinned roadmap issue. Close each
+story when its "Done when" holds, referencing it from the commit (`Closes #N`).
 
 `REQUIREMENTS.md` §0 is dated July and lags reality; trust the roadmap and the code. It
 gets updated in PRES-1.
