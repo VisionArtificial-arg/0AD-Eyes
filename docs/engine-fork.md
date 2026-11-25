@@ -147,3 +147,21 @@ Copy both into the repo for the `yolo` detector (MOD-4).
 Locally (CPU), install the extras together so torch and torchvision come as a matching
 build: `uv sync --extra cpu --extra yolo`. The PC's RX 5500 has no ROCm support, so real
 training runs on Kaggle/Colab.
+
+## Running our model (MOD-4)
+
+Copy a training run's `sidecar.json` and `weights/` into `models/yolo/` (or point
+`yolo.sidecar_path` elsewhere), then:
+
+```bash
+uv sync --extra cpu --extra yolo
+uv run --extra cpu --extra yolo zero-ad-eyes run --recording <video> --detector yolo
+uv run --extra cpu --extra yolo zero-ad-eyes eval --engine-run <dataset-root> --split test --detector yolo
+```
+
+- **Class map:** the adapter refuses weights whose class names differ from the
+  sidecar's.
+- **Per detection** it emits the coarse kind, the fine class (`resource_wood`, `unit`,
+  …), the box and a simplified mask outline.
+- **Confidence cutoff:** `yolo.conf_threshold` defaults low (0.15), biased towards
+  finding things.

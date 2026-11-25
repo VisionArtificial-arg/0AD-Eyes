@@ -489,6 +489,13 @@
     "score_threshold": 0.0,
     "min_region_area": 16
   },
+  "yolo": {
+    "sidecar_path": "models/yolo/sidecar.json",
+    "conf_threshold": 0.15,
+    "iou_threshold": 0.6,
+    "max_detections": 300,
+    "imgsz": 0
+  },
   "events": {
     "entity": true,
     "hud": true,

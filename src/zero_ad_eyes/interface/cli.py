@@ -74,7 +74,8 @@ def _perception_model(detector: str, config: Config) -> PerceptionModel:
 
     ``stub`` is the default until the model-team adapter lands: it emits no
     main-scene detections, while HUD/minimap/calibration still run classically.
-    ``classical`` remains an explicit debug baseline only.
+    ``classical`` remains an explicit debug baseline only. ``learned`` is the colleague's
+    U-Net (``best.pt``); ``yolo`` is our own YOLO11-seg (``config.yolo``).
     """
 
     if detector == "classical":
@@ -85,6 +86,10 @@ def _perception_model(detector: str, config: Config) -> PerceptionModel:
         from zero_ad_eyes.infrastructure.model import SegmentationPerceptionModel
 
         return SegmentationPerceptionModel.from_settings(config.segmentation)
+    if detector == "yolo":
+        from zero_ad_eyes.infrastructure.model.yolo_adapter import YoloSegPerceptionModel
+
+        return YoloSegPerceptionModel.from_settings(config.yolo)
     return StubPerceptionModel()
 
 
@@ -738,7 +743,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     run.add_argument(
         "--detector",
-        choices=("classical", "stub", "learned"),
+        choices=("classical", "stub", "learned", "yolo"),
         default="stub",
         help=(
             "main-viewport detector behind the model seam "
@@ -786,7 +791,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     ev.add_argument(
         "--detector",
-        choices=("classical", "stub", "learned"),
+        choices=("classical", "stub", "learned", "yolo"),
         default="stub",
         help="main-viewport detector behind the model seam for --recording (default: stub)",
     )
@@ -812,7 +817,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench.add_argument("--height", type=int, default=720)
     bench.add_argument("--warmup", type=int, default=5)
     bench.add_argument("--recording", default=None, help="benchmark the recording pipeline")
-    bench.add_argument("--detector", choices=("classical", "stub", "learned"), default="stub")
+    bench.add_argument(
+        "--detector", choices=("classical", "stub", "learned", "yolo"), default="stub"
+    )
     bench.add_argument(
         "--config", default=None, help="path to a JSON config file (NF7); env ZAE_* overrides it"
     )

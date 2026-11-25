@@ -537,6 +537,19 @@ class SegmentationModelSettings(BaseModel):
     min_region_area: int = Field(ge=0)
 
 
+class YoloModelSettings(BaseModel):
+    """Our YOLO11-seg detector (MOD-4). The class map and input size come from the
+    training sidecar, so they always match the weights."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sidecar_path: str  # training output sidecar.json; weights path is relative to it
+    conf_threshold: float = Field(ge=0.0, le=1.0)  # recall-biased: downstream filters
+    iou_threshold: float = Field(ge=0.0, le=1.0)  # NMS
+    max_detections: int = Field(ge=1)
+    imgsz: int = Field(ge=0)  # 0 = the training size from the sidecar
+
+
 class DatasetSettings(BaseModel):
     """Engine-fork runs → YOLO-seg dataset (ENG-6). Offline tooling only."""
 
@@ -585,5 +598,6 @@ class Config(BaseModel):
     acquisition: AcquisitionSettings
     geometry: GeometrySettings
     segmentation: SegmentationModelSettings
+    yolo: YoloModelSettings
     events: EventSettings
     dataset: DatasetSettings

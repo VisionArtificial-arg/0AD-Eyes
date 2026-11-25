@@ -55,6 +55,7 @@ from zero_ad_eyes.application.settings import (
     TrackingSettings,
     ViewportSettings,
     WorldExtentSettings,
+    YoloModelSettings,
 )
 from zero_ad_eyes.domain.minimap import FogState
 from zero_ad_eyes.domain.taxonomy import Ownership
@@ -309,6 +310,13 @@ def default_config() -> Config:
             input_width=384,
             score_threshold=0.0,  # model has no confidence gate; keep all argmax blobs
             min_region_area=16,  # drop pixel-speckle blobs (seg→entity denoise)
+        ),
+        yolo=YoloModelSettings(
+            sidecar_path="models/yolo/sidecar.json",  # copy a training run (MOD-3) here
+            conf_threshold=0.15,  # recall-biased (events over silence); filter downstream
+            iou_threshold=0.6,
+            max_detections=300,  # crowded battles
+            imgsz=0,  # use the training size
         ),
         events=EventSettings(
             entity=True,
