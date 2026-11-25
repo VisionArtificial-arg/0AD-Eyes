@@ -21,6 +21,7 @@ from zero_ad_eyes.application.settings import (
     Config,
     ConstructionCueSettings,
     DatasetSettings,
+    EventOriginPalette,
     EventSettings,
     FogPalette,
     FogSettings,
@@ -57,6 +58,7 @@ from zero_ad_eyes.application.settings import (
     WorldExtentSettings,
     YoloModelSettings,
 )
+from zero_ad_eyes.domain.events import EventOrigin
 from zero_ad_eyes.domain.minimap import FogState
 from zero_ad_eyes.domain.taxonomy import Ownership
 
@@ -108,6 +110,18 @@ def _default_overlay() -> OverlaySettings:
         font_scale=0.4,
         box_thickness=1,
         minimap_fraction=0.25,
+        event_palette=EventOriginPalette(
+            colors={
+                EventOrigin.SYSTEM: (255, 80, 80),
+                EventOrigin.HUD: (255, 220, 90),
+                EventOrigin.MINIMAP: (110, 200, 255),
+                EventOrigin.ENTITY: (150, 255, 150),
+                EventOrigin.UNKNOWN: (220, 220, 220),
+            }
+        ),
+        event_log_lines=10,
+        event_log_hold_frames=90,  # ~6 s at 15 fps
+        event_marker_radius=10,
     )
 
 

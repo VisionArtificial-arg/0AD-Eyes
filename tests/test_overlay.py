@@ -7,6 +7,7 @@ Every test renders onto a synthetic black frame and asserts on shape/dtype and o
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -209,3 +210,70 @@ def test_overlay_video_sink_writes_annotated_frames(tmp_path: Path) -> None:
     assert len(writer.frames) == 1
     assert _changed(writer.frames[0], frame.image)
     assert writer.released
+
+
+# --------------------------------------------------------------------------- #
+# EVT-7 — event log + markers                                                 #
+# --------------------------------------------------------------------------- #
+
+
+def _events_model(frame_id: int, *events: Any) -> Any:
+    from zero_ad_eyes.domain.world_model import FrameMeta, WorldModel
+
+    meta = FrameMeta(
+        frame_id=frame_id, timestamp=float(frame_id), source="t", width=320, height=240
+    )
+    return WorldModel(meta=meta, events=tuple(events))
+
+
+def _event(kind: str, origin: str, frame_id: int = 0, **extra: Any) -> Any:
+    from zero_ad_eyes.domain.events import Event
+
+    return Event.model_validate({"kind": kind, "origin": origin, "frame_id": frame_id, **extra})
+
+
+def test_format_event_is_one_compact_line() -> None:
+    from zero_ad_eyes.interface.overlay import format_event
+
+    event = _event(
+        "combat",
+        "entity",
+        entity_id=7,
+        details={
+            "entity_kind": "unit",
+            "ownership": "enemy",
+            "health_before": 1.0,
+            "health_after": 0.6,
+        },
+    )
+    assert format_event(event) == "combat #7 ownership=enemy health_before=1.00 health_after=0.60"
+    long = _event("blip_appeared", "minimap", details={"ownership": "enemy" * 20})
+    assert len(format_event(long)) == 72 and format_event(long).endswith("...")
+
+
+def test_event_log_keeps_the_newest_and_expires_old_entries() -> None:
+    from zero_ad_eyes.interface.overlay import EventLog
+
+    log = EventLog(lines=3, hold_frames=5)
+    first = log.add(
+        _events_model(0, _event("phase_changed", "hud"), _event("recalibrated", "system"))
+    )
+    assert [line.text for line in first] == ["recalibrated", "phase_changed"]  # newest first
+    crowded = log.add(_events_model(1, *(_event("camera_moved", "minimap") for _ in range(3))))
+    assert len(crowded) == 3 and all(line.frame_id == 1 for line in crowded)
+    assert log.add(_events_model(6)) == ()  # 5 frames later: all expired
+
+
+def test_event_log_panel_and_markers_are_drawn() -> None:
+    from zero_ad_eyes.domain.geometry import ScreenPoint
+    from zero_ad_eyes.interface.overlay import EventLog
+
+    frame = make_frame(width=320, height=240)
+    event = _event("unit_appeared", "entity", screen_pos=ScreenPoint(x=160, y=200))
+    model = _events_model(0, event)
+    plain = render(frame, model.model_copy(update={"events": ()}))
+    marked = render(frame, model)
+    assert (marked != plain).any()  # the ring
+    logged = render(frame, model, event_log=EventLog(lines=5, hold_frames=10).add(model))
+    top_right = (slice(0, 20), slice(240, 320))
+    assert (logged[top_right] != marked[top_right]).any()  # the panel

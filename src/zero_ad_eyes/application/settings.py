@@ -23,6 +23,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.domain.events import EventOrigin
 from zero_ad_eyes.domain.minimap import FogState
 from zero_ad_eyes.domain.taxonomy import Ownership
 
@@ -51,6 +52,17 @@ class FogPalette(BaseModel):
         return self.colors.get(state, self.colors[FogState.UNEXPLORED])
 
 
+class EventOriginPalette(BaseModel):
+    """RGB colour per event :class:`EventOrigin`, for the overlay event log (EVT-7)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    colors: dict[EventOrigin, RGB]
+
+    def for_origin(self, origin: EventOrigin) -> RGB:
+        return self.colors.get(origin, self.colors[EventOrigin.UNKNOWN])
+
+
 class OverlaySettings(BaseModel):
     """Everything the debug overlay (X1) needs to draw."""
 
@@ -70,6 +82,11 @@ class OverlaySettings(BaseModel):
     font_scale: float = Field(gt=0.0)
     box_thickness: int = Field(ge=1)
     minimap_fraction: float = Field(gt=0.0, le=1.0)
+    # Event log panel (EVT-7): the newest events, top-right, coloured by origin.
+    event_palette: EventOriginPalette
+    event_log_lines: int = Field(ge=0)  # 0 hides the panel
+    event_log_hold_frames: int = Field(ge=1)  # how long an event stays listed
+    event_marker_radius: int = Field(ge=0)  # ring at an event's screen position; 0 = none
 
     def health_color(self, fraction: float) -> RGB:
         if fraction >= self.health_good_min:
