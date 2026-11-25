@@ -7,7 +7,9 @@ visually verified (§9 X1, DoD-B). Draws, from the ``WorldModel``:
 - a *health bar* per entity coloured by fraction (E4);
 - a *HUD summary* banner (resources, population, phase, self-id) (§4.2);
 - *minimap blips* and the camera viewport projected into a corner panel (§4.4);
-- an optional *fog-of-war* grid tinted per cell state (§4.4/§4.5).
+- an optional *fog-of-war* grid tinted per cell state (§4.4/§4.5);
+- a scrolling *event log* coloured by origin, and a ring at each event's screen
+  position (EVT-7).
 
 Design notes:
 - ``render`` keeps its original ``(frame, world_model)`` signature working; the
@@ -19,7 +21,9 @@ Design notes:
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import Any
@@ -27,6 +31,7 @@ from typing import Any
 from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.application.settings import OverlaySettings
 from zero_ad_eyes.domain.entities import Entity
+from zero_ad_eyes.domain.events import Event, EventOrigin
 from zero_ad_eyes.domain.minimap import Blip, FogState, MinimapModel
 from zero_ad_eyes.domain.world_model import WorldModel
 from zero_ad_eyes.interface.default_config import default_config
@@ -66,6 +71,9 @@ class OverlayVideoSink:
         self._window_name = window_name
         self._writer_factory = writer_factory
         self._writer: Any | None = None
+        self._event_log = EventLog(
+            lines=settings.event_log_lines, hold_frames=settings.event_log_hold_frames
+        )
 
     @property
     def video_path(self) -> Path | None:
@@ -74,7 +82,13 @@ class OverlayVideoSink:
     def publish(self, frame: Frame, world_model: WorldModel) -> None:
         minimap = world_model.minimap
         fog = minimap.fog.cells if minimap is not None and minimap.fog is not None else None
-        annotated = render(frame, world_model, settings=self._settings, fog=fog)
+        annotated = render(
+            frame,
+            world_model,
+            settings=self._settings,
+            fog=fog,
+            event_log=self._event_log.add(world_model),
+        )
         self._write(annotated)
         self._display(annotated)
 
@@ -135,6 +149,7 @@ def render(
     *,
     settings: OverlaySettings | None = None,
     fog: FogGrid | None = None,
+    event_log: Sequence[EventLine] | None = None,
 ) -> Any:
     """Return a copy of ``frame.image`` with the world model drawn on top.
 
@@ -142,7 +157,9 @@ def render(
     (:func:`interface.default_config.default_config` — the single source of default
     values; no disk/env I/O, so rendering stays pure and deterministic, NF5). ``fog``,
     when given, tints a grid over the minimap panel; it is a separate argument because
-    per-cell fog is not (yet) carried inside :class:`WorldModel`.
+    per-cell fog is not (yet) carried inside :class:`WorldModel`. ``event_log`` lists
+    recent events in a top-right panel (EVT-7); this frame's events with a screen
+    position are ringed on screen either way.
     """
 
     import cv2  # local import: keep module import headless-safe
@@ -155,6 +172,9 @@ def render(
 
     _draw_minimap_panel(canvas, world_model.minimap, fog, cfg, cv2)
     _draw_hud_summary(canvas, world_model, cfg, cv2)
+    _draw_event_markers(canvas, world_model, cfg, cv2)
+    if event_log is not None:
+        _draw_event_log(canvas, event_log, cfg, cv2)
 
     return canvas
 
@@ -380,3 +400,99 @@ def _draw_viewport(
     points = [_project(corner.x, corner.y, bounds, panel) for corner in viewport.corners()]
     for index in range(len(points)):
         cv2.line(canvas, points[index], points[(index + 1) % len(points)], (255, 255, 255), 1)
+
+
+# --------------------------------------------------------------------------- #
+# Event log (EVT-7)                                                           #
+# --------------------------------------------------------------------------- #
+
+#: Entity context every entity event carries; left off the one-line summary.
+_CONTEXT_KEYS = frozenset({"entity_kind", "entity_type", "health", "viewport_known"})
+_MAX_LINE = 72
+
+
+@dataclass(frozen=True)
+class EventLine:
+    """One entry of the overlay's event log."""
+
+    frame_id: int
+    origin: EventOrigin
+    text: str
+
+
+def format_event(event: Event) -> str:
+    """A compact one-line summary: ``kind #id key=value …`` (truncated)."""
+
+    parts = [event.kind.value]
+    if event.entity_id is not None:
+        parts.append(f"#{event.entity_id}")
+    for key, value in event.details.items():
+        if key in _CONTEXT_KEYS or value is None:
+            continue
+        shown = f"{value:.2f}" if isinstance(value, float) else str(value)
+        parts.append(f"{key}={shown}")
+    text = " ".join(parts)
+    return text if len(text) <= _MAX_LINE else text[: _MAX_LINE - 3] + "..."  # ASCII: Hershey fonts
+
+
+class EventLog:
+    """The newest events, each kept for ``hold_frames`` frames, newest first."""
+
+    def __init__(self, *, lines: int, hold_frames: int) -> None:
+        self._lines = lines
+        self._hold = hold_frames
+        self._entries: deque[EventLine] = deque()
+
+    def add(self, world_model: WorldModel) -> tuple[EventLine, ...]:
+        """Take this frame's events and return the lines to show now."""
+
+        frame_id = world_model.meta.frame_id
+        for event in world_model.events:
+            self._entries.appendleft(EventLine(frame_id, event.origin, format_event(event)))
+        while self._entries and frame_id - self._entries[-1].frame_id >= self._hold:
+            self._entries.pop()
+        while len(self._entries) > max(self._lines, 0):
+            self._entries.pop()
+        return tuple(self._entries)
+
+
+def _draw_event_log(
+    canvas: Any, lines: Sequence[EventLine], cfg: OverlaySettings, cv2: Any
+) -> None:
+    if not lines or cfg.event_log_lines == 0:
+        return
+    scale = cfg.font_scale
+    line_h = max(10, int(18 * scale / 0.4))
+
+    pad = 4
+    texts = [f"{line.frame_id} {line.text}" for line in lines]
+    width = int(canvas.shape[1])
+    widest = max(cv2.getTextSize(t, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)[0][0] for t in texts)
+    panel_w = min(width, pad * 2 + widest)
+    panel_h = pad * 2 + line_h * len(texts)
+    x0 = width - panel_w
+    cv2.rectangle(canvas, (x0, 0), (width - 1, panel_h), _bgr(cfg.hud_panel_color), -1)
+    for i, (line, text) in enumerate(zip(lines, texts, strict=True)):
+        cv2.putText(
+            canvas,
+            text,
+            (x0 + pad, pad + line_h * (i + 1) - 4),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            scale,
+            _bgr(cfg.event_palette.for_origin(line.origin)),
+            1,
+            cv2.LINE_AA,
+        )
+
+
+def _draw_event_markers(
+    canvas: Any, world_model: WorldModel, cfg: OverlaySettings, cv2: Any
+) -> None:
+    if cfg.event_marker_radius == 0:
+        return
+    for event in world_model.events:
+        if event.screen_pos is None:
+            continue
+        center = (int(event.screen_pos.x), int(event.screen_pos.y))
+        color = _bgr(cfg.event_palette.for_origin(event.origin))
+        cv2.circle(canvas, center, cfg.event_marker_radius, color, 2, cv2.LINE_AA)

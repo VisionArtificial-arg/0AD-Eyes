@@ -47,6 +47,8 @@ observe, each with a confidence, and the consumer decides what to ignore.
 
 Sources run in a fixed order, so a recording always yields the same event list: system,
 then HUD, then minimap, then entity. Each can be switched off in the `events` config section.
+The debug overlay (`run --overlay` / `--record-overlay`) lists recent events in a top-right
+panel coloured by origin and rings each event's screen position (`overlay.event_*` settings).
 
 #### System events (`origin: system`)
 

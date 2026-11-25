@@ -91,7 +91,39 @@
     ],
     "font_scale": 0.4,
     "box_thickness": 1,
-    "minimap_fraction": 0.25
+    "minimap_fraction": 0.25,
+    "event_palette": {
+      "colors": {
+        "system": [
+          255,
+          80,
+          80
+        ],
+        "hud": [
+          255,
+          220,
+          90
+        ],
+        "minimap": [
+          110,
+          200,
+          255
+        ],
+        "entity": [
+          150,
+          255,
+          150
+        ],
+        "unknown": [
+          220,
+          220,
+          220
+        ]
+      }
+    },
+    "event_log_lines": 10,
+    "event_log_hold_frames": 90,
+    "event_marker_radius": 10
   },
   "perception": {
     "ownership_palette": {
