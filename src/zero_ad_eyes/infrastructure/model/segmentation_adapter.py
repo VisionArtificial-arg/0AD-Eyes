@@ -31,7 +31,8 @@ from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.detections import Detection, Detections
 from zero_ad_eyes.domain.geometry import ScreenBBox
-from zero_ad_eyes.domain.taxonomy import EntityKind
+
+from .segmentation_classes import CLASS_NAMES, ENTITY_CLASS_IDS, KIND_BY_CLASS_ID, NUM_CLASSES
 
 if TYPE_CHECKING:  # torch only present with the `learned` extra
     import torch
@@ -41,55 +42,11 @@ if TYPE_CHECKING:  # torch only present with the `learned` extra
 # --- Model-intrinsic constants (tied to best.pt; not user tunables) --------- #
 
 DEFAULT_WEIGHTS = Path(__file__).with_name("best.pt")
-NUM_CLASSES = 17
 BASE_CHANNELS = 32
 
-#: class-id → human label (the training taxonomy, supplied at hand-off).
-CLASS_NAMES: dict[int, str] = {
-    0: "unlabeled",
-    1: "terrain_grass",
-    2: "terrain_sand",
-    3: "terrain_dirt",
-    4: "terrain_rock",
-    5: "terrain_snow",
-    6: "terrain_road",
-    7: "terrain_special",
-    8: "water",
-    9: "resource_wood",
-    10: "resource_stone",
-    11: "resource_metal",
-    12: "resource_food",
-    13: "vegetation",
-    14: "fauna",
-    15: "building",
-    16: "unit",
-}
+#: The classes emitted as entities (alias kept for the adapter tests).
+_EMIT_CLASSES = ENTITY_CLASS_IDS
 
-#: class-id → coarse ``EntityKind`` (MP2 class map). Terrain/water/backdrop resolve
-#: to OTHER but are dropped before emission (see ``_EMIT_CLASSES``).
-KIND_BY_CLASS_ID: dict[int, EntityKind] = {
-    0: EntityKind.OTHER,
-    1: EntityKind.OTHER,
-    2: EntityKind.OTHER,
-    3: EntityKind.OTHER,
-    4: EntityKind.OTHER,
-    5: EntityKind.OTHER,
-    6: EntityKind.OTHER,
-    7: EntityKind.OTHER,
-    8: EntityKind.OTHER,
-    9: EntityKind.RESOURCE_NODE,
-    10: EntityKind.RESOURCE_NODE,
-    11: EntityKind.RESOURCE_NODE,
-    12: EntityKind.RESOURCE_NODE,
-    13: EntityKind.OTHER,
-    14: EntityKind.UNIT,
-    15: EntityKind.BUILDING,
-    16: EntityKind.UNIT,
-}
-
-#: The classes worth emitting as entities. Terrain (0-8), decorative vegetation (13)
-#: and the unlabeled backdrop are scene, not entities, so they are not detected.
-_EMIT_CLASSES: frozenset[int] = frozenset({9, 10, 11, 12, 14, 15, 16})
 
 # --- Preprocessing / post-processing defaults (v1; pre-config) -------------- #
 
