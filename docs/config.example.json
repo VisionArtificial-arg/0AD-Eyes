@@ -486,5 +486,8 @@
     "input_width": 384,
     "score_threshold": 0.0,
     "min_region_area": 16
+  },
+  "events": {
+    "entity": true
   }
 }

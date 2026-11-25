@@ -23,7 +23,7 @@ from zero_ad_eyes.domain.hud import HudState
 from zero_ad_eyes.domain.minimap import MinimapModel
 from zero_ad_eyes.domain.world_model import WorldModel
 
-from .frames import Frame
+from .frames import Frame, PerceptionContext
 
 
 @runtime_checkable
@@ -134,13 +134,15 @@ class EntityFuser(Protocol):
 
 @runtime_checkable
 class EventSource(Protocol):
-    """EPIC G/G8 — derives discrete world events from frame-over-frame entity changes.
+    """EPIC G/G8 — derives discrete events from frame-over-frame changes (EVT-2).
 
-    Stateful across calls (it diffs against the previous frame), returning the
-    domain events for *this* frame. Reads only the ``Entity`` contract, never pixels.
+    One source per surface (HUD, minimap, entities, the pipeline itself). Each is
+    stateful across calls: it diffs this frame's world model (built without events)
+    against what it saw last, and returns the events for *this* frame. Sources read
+    the contract and the ``PerceptionContext``, never pixels.
     """
 
-    def detect(self, entities: tuple[Entity, ...], frame_id: int) -> tuple[Event, ...]: ...
+    def events(self, world_model: WorldModel, context: PerceptionContext) -> tuple[Event, ...]: ...
 
 
 @runtime_checkable

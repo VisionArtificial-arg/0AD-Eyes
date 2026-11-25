@@ -9,13 +9,13 @@ merged in — with no change here (REQUIREMENTS.md §5.10, §2 D-decisions).
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import AbstractContextManager, nullcontext
 
 from zero_ad_eyes.domain.calibration import Calibration
 from zero_ad_eyes.domain.world_model import WorldModel
 
-from .frames import Frame
+from .frames import Frame, PerceptionContext
 from .ports import (
     Calibrator,
     EntityEnricher,
@@ -65,7 +65,7 @@ class PerceptionPipeline:
         enricher: EntityEnricher | None = None,
         projector: ScreenToWorldProjector | None = None,
         fuser: EntityFuser | None = None,
-        event_detector: EventSource | None = None,
+        event_sources: Sequence[EventSource] = (),
         sink: WorldModelSink | None = None,
         profiler: StageProfiler | None = None,
     ) -> None:
@@ -81,7 +81,7 @@ class PerceptionPipeline:
         self._enricher = enricher
         self._projector = projector
         self._fuser = fuser
-        self._event_detector = event_detector
+        self._event_sources = tuple(event_sources)
         self._sink = sink
         self._profiler = profiler
 
@@ -101,10 +101,10 @@ class PerceptionPipeline:
                     frame = self._preprocessor.process(raw)
             else:
                 frame = raw
-            calibration, frames_since_check = self._resolve_calibration(
+            calibration, frames_since_check, context = self._resolve_calibration(
                 frame, calibration, frames_since_check
             )
-            world_model = self._perceive(frame, calibration)
+            world_model = self._perceive(frame, calibration, context)
             if self._sink is not None:
                 with self._stage("sink"):
                     self._sink.publish(world_model)
@@ -112,7 +112,7 @@ class PerceptionPipeline:
 
     def _resolve_calibration(
         self, frame: Frame, previous: Calibration | None, frames_since_check: int
-    ) -> tuple[Calibration | None, int]:
+    ) -> tuple[Calibration | None, int, PerceptionContext]:
         """Reuse (B3) vs re-detect, with a periodic layout self-check (B4).
 
         Calibration is session-stable and keyed by resolution (A4), so the prior
@@ -121,29 +121,32 @@ class PerceptionPipeline:
         changed, or (every ``recalibrate_interval`` frames) the self-check reports the
         live layout has drifted. The self-check re-runs anchor detection, so it is
         amortised over the interval rather than paid per frame. Returns the calibration
-        to use and the updated frames-since-check counter.
+        to use, the updated frames-since-check counter, and what happened (for events).
         """
 
         if self._calibrator is None:
-            return previous, frames_since_check
+            return previous, frames_since_check, PerceptionContext()
         if previous is None or not _same_resolution(frame, previous):
-            return self._detect(frame), 0
+            return self._detect(frame), 0, PerceptionContext(recalibrated=True)
 
         if self._self_check is None or frames_since_check + 1 < self._recalibrate_interval:
-            return previous, frames_since_check + 1
+            return previous, frames_since_check + 1, PerceptionContext()
 
         with self._stage("selfcheck"):
             verdict = self._self_check.verify(frame, previous)
         if verdict.matches:
-            return previous, 0  # layout confirmed; restart the interval
-        return self._detect(frame), 0
+            return previous, 0, PerceptionContext()  # layout confirmed; restart the interval
+        drifted = PerceptionContext(recalibrated=True, layout_drift=True)
+        return self._detect(frame), 0, drifted
 
     def _detect(self, frame: Frame) -> Calibration:
         assert self._calibrator is not None  # only reached when a calibrator is present
         with self._stage("calibrate"):
             return self._calibrator.calibrate(frame)
 
-    def _perceive(self, frame: Frame, calibration: Calibration | None) -> WorldModel:
+    def _perceive(
+        self, frame: Frame, calibration: Calibration | None, context: PerceptionContext
+    ) -> WorldModel:
         hud = None
         minimap = None
         if calibration is not None:
@@ -173,16 +176,15 @@ class PerceptionPipeline:
             with self._stage("fuse"):
                 entities = self._fuser.fuse(entities, minimap)
 
-        if self._event_detector is not None:
-            with self._stage("events"):
-                events = self._event_detector.detect(entities, frame.meta.frame_id)
-        else:
-            events = ()
-
-        return WorldModel(
-            meta=frame.meta,
-            hud=hud,
-            minimap=minimap,
-            entities=entities,
-            events=events,
-        )
+        world_model = WorldModel(meta=frame.meta, hud=hud, minimap=minimap, entities=entities)
+        if not self._event_sources:
+            return world_model
+        # Each source sees the same event-free model; their events are concatenated in
+        # source order, so a recording always yields the same event list (NF5).
+        with self._stage("events"):
+            events = tuple(
+                event
+                for source in self._event_sources
+                for event in source.events(world_model, context)
+            )
+        return world_model.model_copy(update={"events": events})
