@@ -17,12 +17,20 @@ dependencies = [
 # The learned segmentation adapter (MP4). Optional so the core stays numpy+opencv.
 # Pick exactly ONE at install time: `--extra cpu` (small CPU-only wheels) or
 # `--extra gpu` (CUDA build; needs an NVIDIA driver). Same torch, different build.
-cpu = ["torch>=2.2"]
-gpu = ["torch>=2.2"]
+cpu = ["torch>=2.2", "torchvision"]  # torchvision: ultralytics needs it; must match torch
+gpu = ["torch>=2.2", "torchvision"]
+# YOLO11-seg training + the yolo detector adapter (MOD-2/MOD-4). Combine with cpu or gpu
+# so torch comes from the matching index: `uv sync --extra cpu --extra yolo`.
+# Ultralytics is AGPL-3.0.
+yolo = ["ultralytics>=8.3,<9"]
 
 [tool.uv.sources]
 # Route torch to the CPU or CUDA wheel index depending on which extra is selected.
 torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cuda", extra = "gpu" },
+]
+torchvision = [
     { index = "pytorch-cpu", extra = "cpu" },
     { index = "pytorch-cuda", extra = "gpu" },
 ]
@@ -74,7 +82,7 @@ addopts = "-ra"
 
 [tool.mypy]
 python_version = "3.12"
-files = ["src", "tests"]
+files = ["src", "tests", "training"]
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 check_untyped_defs = true

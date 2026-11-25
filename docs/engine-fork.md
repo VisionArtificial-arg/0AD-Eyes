@@ -125,3 +125,25 @@ uv run --extra cpu zero-ad-eyes eval --engine-run <dataset-root> --split test \
 - **`--seg-audit`** adds IoU per class, plain mIoU and **entity mIoU** (entity classes
   only, since terrain inflates the plain number).
 - **Unmeasured metrics** print as `unmeasured`, never as a pass.
+
+## Training our model (MOD-2 / MOD-3)
+
+`training/train_yolo_seg.py` is standalone: on Kaggle or Colab it needs only
+`pip install "ultralytics>=8.3,<9"` and the zipped `dataset build` output. Usage is in
+its docstring. In short:
+
+```bash
+python train_yolo_seg.py --data <dataset>/data.yaml --project runs --name v1   # GPU notebook
+```
+
+- **Training setup:** YOLO11n-seg at imgsz 1280 by default, with early stopping.
+- **Test split:** the best weights are scored on it, and the split holds whole held-out
+  matches.
+- **Output:** `runs/v1/weights/best.pt` plus `runs/v1/sidecar.json` (class map, input
+  size, test box/mask mAP, the dataset report).
+
+Copy both into the repo for the `yolo` detector (MOD-4).
+
+Locally (CPU), install the extras together so torch and torchvision come as a matching
+build: `uv sync --extra cpu --extra yolo`. The PC's RX 5500 has no ROCm support, so real
+training runs on Kaggle/Colab.
