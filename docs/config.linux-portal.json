@@ -1,0 +1,9 @@
+{
+  "acquisition": {
+    "capture_backend": "portal",
+    "portal_source_type": "window",
+    "portal_cursor": "hidden",
+    "portal_helper_python": "/usr/bin/python3",
+    "portal_restore_token_file": "calibration/portal-restore-token"
+  }
+}

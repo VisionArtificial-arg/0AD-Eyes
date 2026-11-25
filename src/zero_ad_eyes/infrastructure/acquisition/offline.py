@@ -28,7 +28,13 @@ ImageReader = Callable[[str], Any]
 
 
 class VideoFileSource:
-    """Replays a video file frame by frame as a ``FrameSource``."""
+    """Replays a video file frame by frame as a ``FrameSource``.
+
+    Works on any video OpenCV can decode (e.g. an OBS recording with no sidecar): the
+    clock comes from the container (``CAP_PROP_POS_MSEC``, falling back to fps). With
+    ``stride`` N only every Nth frame is decoded and yielded; ``frame_id`` keeps the
+    frame's index in the video, so ids stay comparable across strides.
+    """
 
     def __init__(
         self,
@@ -36,10 +42,14 @@ class VideoFileSource:
         *,
         source: str | None = None,
         capture_factory: CaptureFactory | None = None,
+        stride: int = 1,
     ) -> None:
+        if stride < 1:
+            raise ValueError(f"stride must be ≥ 1, got {stride}")
         self._path = Path(path)
         self._source = source if source is not None else self._path.stem
         self._open = capture_factory if capture_factory is not None else self._default_factory
+        self._stride = stride
 
     def _default_factory(self) -> Any:
         return cv2.VideoCapture(str(self._path))
@@ -52,6 +62,11 @@ class VideoFileSource:
             fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0)
             frame_id = 0
             while True:
+                if frame_id % self._stride:
+                    if not capture.grab():  # skip without decoding
+                        break
+                    frame_id += 1
+                    continue
                 ok, image = capture.read()
                 if not ok or image is None:
                     break

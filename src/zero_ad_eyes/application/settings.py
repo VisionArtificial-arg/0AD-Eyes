@@ -471,6 +471,7 @@ class AcquisitionSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     offline_fps: float = Field(gt=0.0)  # image-folder replay pacing
+    offline_video_stride: int = Field(ge=1)  # replay every Nth frame of a plain video
     image_extensions: tuple[str, ...]
     live_monitor: int = Field(ge=0)  # mss monitor index (0 = the all-monitors virtual)
     live_fps: float = Field(gt=0.0)  # live-capture target pacing
