@@ -96,6 +96,7 @@ class Thresholds(BaseModel):
     ownership_accuracy_target: float = Field(ge=0.0, le=1.0)  # NF3
     tracking_mota_target: float = Field(ge=0.0, le=1.0)  # NF3
     eval_iou_threshold: float = Field(ge=0.0, le=1.0)  # ML8 box-match IoU
+    eval_blip_match_radius: float = Field(gt=0.0)  # ML8 minimap blip ↔ entity, world units
 
 
 # --------------------------------------------------------------------------- #

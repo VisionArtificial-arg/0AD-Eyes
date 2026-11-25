@@ -274,7 +274,9 @@ def ownership_accuracy(
     ``entity_id`` would be wrong here: the predicted id is the tracker's own track id
     while the ground-truth id is the engine entity id — the two id spaces never
     coincide when perceiving from pixels, so id-matching would score ~0 on real data.
-    A ground-truth entity with no IoU-matched prediction counts as incorrect (you
+    Only ground-truth entities with a screen box are scored: an entity off-screen or
+    fully occluded is not visible, so missing its owner is not an error (D1). A boxed
+    ground-truth entity with no IoU-matched prediction counts as incorrect (you
     cannot read the owner of an entity you failed to locate). Returns ``None`` if
     there are no ground-truth entities at all.
     """
@@ -288,6 +290,8 @@ def ownership_accuracy(
         matches = _match_frame(pred_entities, gt.entities, iou_threshold)
         pred_by_id = {entity.entity_id: entity for entity in pred_entities}
         for gt_entity in gt.entities:
+            if gt_entity.screen_bbox is None:
+                continue
             total += 1
             matched_pred_id = matches.get(gt_entity.entity_id)
             match = pred_by_id.get(matched_pred_id) if matched_pred_id is not None else None
@@ -350,9 +354,13 @@ def tracking_mota(
     last_match: dict[int, int] = {}  # gt_id -> pred_id last associated
 
     for gt in sorted(truth, key=lambda wm: wm.meta.frame_id):
-        gt_entities = gt.entities
+        # Only on-screen (boxed) entities can be matched by box: off-screen truth is not
+        # a miss, and box-less predictions (memory) are not false positives.
+        gt_entities = tuple(e for e in gt.entities if e.screen_bbox is not None)
         pred = by_pred_frame.get(gt.meta.frame_id)
-        pred_entities = pred.entities if pred else ()
+        pred_entities = tuple(
+            e for e in (pred.entities if pred else ()) if e.screen_bbox is not None
+        )
 
         total_gt += len(gt_entities)
         matches = _match_frame(pred_entities, gt_entities, iou_threshold)

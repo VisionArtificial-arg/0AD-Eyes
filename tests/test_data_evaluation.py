@@ -295,3 +295,30 @@ def test_measured_failure_fails_verdict_when_nothing_pends() -> None:
     assert report.has_pending is False
     assert report.has_measured_failure is True
     assert report.passed is False
+
+
+def test_unboxed_truth_is_not_scored_for_ownership_or_mota() -> None:
+    """Off-screen / fully occluded truth (no box) is not a miss for a pixel-only system."""
+
+    from zero_ad_eyes.domain.confidence import Confidence
+    from zero_ad_eyes.domain.entities import Entity
+    from zero_ad_eyes.domain.geometry import ScreenBBox
+    from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership
+    from zero_ad_eyes.domain.world_model import FrameMeta, WorldModel
+
+    meta = FrameMeta(frame_id=0, timestamp=0.0, source="t", width=64, height=64)
+    box = ScreenBBox(x=0, y=0, width=10, height=10)
+
+    def entity(entity_id: int, bbox: ScreenBBox | None) -> Entity:
+        return Entity(
+            entity_id=entity_id,
+            kind=EntityKind.UNIT,
+            ownership=Ownership.SELF,
+            screen_bbox=bbox,
+            confidence=Confidence.certain(),
+        )
+
+    truth = [WorldModel(meta=meta, entities=(entity(1, box), entity(2, None)))]
+    predicted = [WorldModel(meta=meta, entities=(entity(9, box), entity(8, None)))]
+    assert ownership_accuracy(predicted, truth) == 1.0
+    assert tracking_mota(predicted, truth, iou_threshold=0.5) == 1.0

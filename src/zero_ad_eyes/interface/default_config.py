@@ -75,6 +75,7 @@ def _default_thresholds() -> Thresholds:
         ownership_accuracy_target=0.98,
         tracking_mota_target=0.70,
         eval_iou_threshold=0.5,
+        eval_blip_match_radius=8.0,  # two terrain tiles (4 world units each)
     )
 
 

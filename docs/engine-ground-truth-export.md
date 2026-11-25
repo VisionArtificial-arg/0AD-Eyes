@@ -125,10 +125,11 @@ in **screen pixels** (axis-aligned).
   else unknown.
 - **World position** is set only when both `world_x` and `world_y` are present.
 - **`bbox` is optional and load-bearing.** An entity *without* `bbox` still becomes a
-  world-model label (ownership, health, world position, HUD) — so it counts toward
-  ownership accuracy and MOTA — but is **excluded from detection labels** (no screen
-  box to score detection mAP against). Emit `bbox` for every entity the exporter can
-  project to the captured view; omit it for off-screen or unprojected entities.
+  world-model label (world position, HUD context) but is **not scored** for detection,
+  ownership accuracy or MOTA: with no screen box it is off-screen or fully occluded,
+  so the eyes cannot be expected to see it (D1). Emit `bbox` for every entity the
+  exporter can project to the captured view; omit it for off-screen or unprojected
+  entities.
 
 ## Minimal complete example
 
@@ -252,8 +253,9 @@ The per-frame schema above (`frame_id`, `timestamp`, `phase`, `resources`,
 ### How the loader labels a frame
 
 An entity gets a screen `bbox` (the tight box of its mask pixels) only when it covers at
-least `min_pixels` pixels and is not `hidden`. Entities without a box stay in the frame,
-so they still count for ownership, health and tracking, as in the rest of this contract.
-`EngineDatasetRun.to_export()` returns a normal `EngineStateExport`, so everything that
+least `min_pixels` pixels and is not `hidden`. The loader also sets `seg_class` (the
+mask's majority class for that instance), which gives the fine per-class detection
+scores. Entities without a box stay in the frame (world position, minimap truth) but
+are not scored for detection, ownership or tracking. `EngineDatasetRun.to_export()` returns a normal `EngineStateExport`, so everything that
 consumes this contract (alignment, `evaluate`, the eval CLI) works on fork output
 unchanged.

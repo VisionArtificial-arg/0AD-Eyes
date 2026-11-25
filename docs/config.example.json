@@ -6,7 +6,8 @@
     "detection_map_target": 0.8,
     "ownership_accuracy_target": 0.98,
     "tracking_mota_target": 0.7,
-    "eval_iou_threshold": 0.5
+    "eval_iou_threshold": 0.5,
+    "eval_blip_match_radius": 8.0
   },
   "paths": {
     "recordings_dir": "recordings",
