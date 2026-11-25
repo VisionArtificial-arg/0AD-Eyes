@@ -323,6 +323,10 @@ def default_config() -> Config:
             hud=True,
             hud_min_resource_delta=1,  # every observable change (events over silence)
             hud_min_selection_health_delta=0.01,
+            minimap=True,
+            minimap_blip_match_radius=12.0,  # three tiles: a blip moving between frames
+            minimap_camera_move_min=4.0,  # one tile
+            minimap_territory_min_change=0.002,
         ),
         dataset=DatasetSettings(
             val_fraction=0.15,

@@ -500,7 +500,11 @@
     "entity": true,
     "hud": true,
     "hud_min_resource_delta": 1,
-    "hud_min_selection_health_delta": 0.01
+    "hud_min_selection_health_delta": 0.01,
+    "minimap": true,
+    "minimap_blip_match_radius": 12.0,
+    "minimap_camera_move_min": 4.0,
+    "minimap_territory_min_change": 0.002
   },
   "dataset": {
     "val_fraction": 0.15,

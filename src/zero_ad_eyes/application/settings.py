@@ -576,6 +576,10 @@ class EventSettings(BaseModel):
     hud: bool  # top bar + selection panel (EVT-3)
     hud_min_resource_delta: int = Field(ge=1)  # smallest stockpile change reported
     hud_min_selection_health_delta: float = Field(ge=0.0, le=1.0)
+    minimap: bool  # blips, territory, fog, camera (EVT-4)
+    minimap_blip_match_radius: float = Field(gt=0.0)  # world units; same blip across frames
+    minimap_camera_move_min: float = Field(ge=0.0)  # world units the view centre must move
+    minimap_territory_min_change: float = Field(ge=0.0, le=1.0)  # fraction of the map
 
 
 class Config(BaseModel):

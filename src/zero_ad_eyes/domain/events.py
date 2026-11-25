@@ -44,6 +44,16 @@ class EventKind(StrEnum):
     SELECTION_HEALTH_CHANGED = "selection_health_changed"
     PRODUCTION_QUEUE_CHANGED = "production_queue_changed"
     GARRISON_CHANGED = "garrison_changed"
+    # Minimap (v0.3, EVT-4)
+    BLIP_APPEARED = "blip_appeared"
+    BLIP_VANISHED = "blip_vanished"
+    ENEMY_IN_TERRITORY = "enemy_in_territory"
+    TERRITORY_GAINED = "territory_gained"
+    TERRITORY_LOST = "territory_lost"
+    AREA_EXPLORED = "area_explored"
+    AREA_VISIBLE = "area_visible"
+    AREA_FOGGED = "area_fogged"
+    CAMERA_MOVED = "camera_moved"
 
 
 class EventOrigin(StrEnum):
