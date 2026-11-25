@@ -6,6 +6,8 @@ This package holds the *[this team] / [shared]* pieces of the Data & ML scope:
   labelling manifest on disk (``dataset_collection``).
 - **ML2** ground-truth alignment scaffolding (D6): a documented engine-state JSON
   schema mapped to domain labels, aligned to captured frames (``ground_truth``).
+- **ML2** engine-fork dataset: run layout, instance-mask codec, loader
+  (``engine_dataset``).
 - **ML3** annotation format: a typed schema for detection / classification /
   ownership / health / fog / minimap labels, with load/save (``annotation``).
 - **ML8** evaluation harness: NF3 metrics (HUD read error, detection mAP,
@@ -23,6 +25,7 @@ from __future__ import annotations
 
 from .annotation import AnnotationSet, FrameAnnotation
 from .dataset_collection import CaptureManifest, DatasetCollector
+from .engine_dataset import EngineDatasetRun, RunManifest, decode_mask, encode_mask, find_runs
 from .evaluation import (
     EvalConfig,
     EvaluationReport,
@@ -40,14 +43,19 @@ __all__ = [
     "AnnotationSet",
     "CaptureManifest",
     "DatasetCollector",
+    "EngineDatasetRun",
     "EngineStateExport",
     "EvalConfig",
     "EvaluationReport",
     "FrameAnnotation",
+    "RunManifest",
     "GroundTruthAligner",
     "MetricResult",
     "MetricStatus",
     "evaluate",
+    "decode_mask",
+    "encode_mask",
     "evaluate_against_engine",
+    "find_runs",
     "mean_average_precision",
 ]

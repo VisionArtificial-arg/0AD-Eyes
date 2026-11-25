@@ -53,6 +53,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -65,6 +66,9 @@ from zero_ad_eyes.domain.taxonomy import EntityKind, Ownership, Phase, ResourceT
 from zero_ad_eyes.domain.world_model import FrameMeta, WorldModel
 
 GAIA_PLAYER = 0
+
+#: An entity's fog-of-war state for the viewing player, as the engine reports it.
+Visibility = Literal["visible", "fogged", "hidden"]
 
 
 class EngineEntityState(BaseModel):
@@ -81,6 +85,11 @@ class EngineEntityState(BaseModel):
     world_x: float | None = None
     world_y: float | None = None
     bbox: ScreenBBox | None = None  # present only if the exporter projected it
+    # Engine-fork dataset fields (docs/engine-ground-truth-export.md, "Engine-fork dataset").
+    template: str | None = None  # full template name, e.g. "units/athen/infantry_spearman_b"
+    world_z: float | None = None  # terrain height at the entity (engine Y axis)
+    visibility: Visibility | None = None  # for the viewing player
+    mask_index: int | None = Field(default=None, ge=1, le=0xFFFF)  # instance index in the mask
 
     def health_fraction(self) -> float | None:
         if self.health_max <= 0.0:
@@ -91,6 +100,43 @@ class EngineEntityState(BaseModel):
         if self.world_x is None or self.world_y is None:
             return None
         return WorldPoint(x=self.world_x, y=self.world_y)
+
+
+class RgbColor(BaseModel):
+    """An 8-bit RGB colour (player colours, as the engine reports them)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    r: int = Field(ge=0, le=255)
+    g: int = Field(ge=0, le=255)
+    b: int = Field(ge=0, le=255)
+
+
+class EnginePlayerState(BaseModel):
+    """One player's state in a frame (engine-fork dataset; every player, not just self)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    player_id: int = Field(ge=0)
+    civ: str | None = None
+    color: RgbColor | None = None
+    phase: Phase = Phase.UNKNOWN
+    resources: dict[ResourceType, int] = Field(default_factory=dict)
+    population_current: int | None = Field(default=None, ge=0)
+    population_cap: int | None = Field(default=None, ge=0)
+
+
+class CameraPose(BaseModel):
+    """The game camera when the frame was rendered (engine-fork dataset)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    x: float  # pivot / target position in world space
+    y: float
+    z: float
+    rot_x: float  # pitch, radians
+    rot_y: float  # yaw, radians
+    zoom: float
 
 
 class EngineFrameState(BaseModel):
@@ -105,6 +151,10 @@ class EngineFrameState(BaseModel):
     population_current: int | None = Field(default=None, ge=0)
     population_cap: int | None = Field(default=None, ge=0)
     entities: tuple[EngineEntityState, ...] = ()
+    # Engine-fork dataset fields. The top-level phase/resources/population above are the
+    # *viewing* player's (what the HUD shows); ``players`` carries every player.
+    players: tuple[EnginePlayerState, ...] = ()
+    camera: CameraPose | None = None
 
 
 class EngineStateExport(BaseModel):

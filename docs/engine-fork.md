@@ -32,13 +32,16 @@ pixel-only. The fork runs only while generating data and is never imported by
 - **`source/tools/dataset/unet/`**: the U-Net training code that produced `best.pt`
   (384×288 input, inverse-frequency class weights, mIoU on val).
 
+**Output contract:** the fork must write the layout, mask encoding and truth JSON pinned in
+`docs/engine-ground-truth-export.md` ("Engine-fork dataset"). Read that before ENG-1/2/3.
+
 ## Known flaws (why `best.pt` is untrusted) and the planned fixes
 
 | Flaw | Where | Fix (story) |
 |---|---|---|
 | Train/val/test is assigned **per frame** at random (70/15/15), so frames from one match leak across splits and the reported mIoU is inflated. | `CDatasetExporter::PickSplit` | Ignore the engine's split and re-split by `runid` on ingest (ENG-6). |
 | The RGB is re-rendered with the GUI off (`RenderFrameImpl(*swapChain, false, false)`), so training frames lack the HUD that real play has. | `RenderSegmentationDatasetCapture` | Render the GUI into the RGB; the mask pass stays scene-only (ENG-2). |
-| The colour is per class, so same-class entities that touch merge into one blob. | `SegmentationColor` | Encode class + entity id in the colour (ENG-1). |
+| The colour is per class, so same-class entities that touch merge into one blob. | `SegmentationColor` | Encode class + per-frame instance index in the colour (ENG-1). |
 | No per-frame metadata: owner, hp, template, resources and camera pose are missing. | — | Write a truth JSON per pair from the simulation (ENG-3). |
 | The 384×288 input loses small units. | `train.py` | Our model trains at imgsz 1280 (MOD-2). |
 

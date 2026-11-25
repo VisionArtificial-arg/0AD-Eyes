@@ -32,11 +32,10 @@ from that; the JSON schema below carries the per-frame simulation state regardle
   occlusion/fog ourselves — acceptable for bulk *training* labels, NOT tight enough for
   *validation*.
 
-> **OPEN — verify first (first exporter task):** does 0 A.D. expose an entity-ID /
-> picking render pass dumpable per frame? Very likely (it underpins mouse-selection),
-> but unverified. **Yes →** build the segmentation export, drop the harness-side path.
-> **No →** fall back to camera-pose + harness-side projection. This one fact decides the
-> exporter's whole shape. See the `exporter-dataset-strategy` project note.
+> **RESOLVED (2026-11-25): engine-side.** The `0A.DDataset` engine fork already renders a
+> segmentation pass (see `docs/engine-fork.md`). The exporter is that fork, writing the
+> **Engine-fork dataset** layout at the end of this document. The camera-pose path survives
+> only in the `cvdump` fallback.
 
 **Regardless of approach:** label only what the pixels actually show (on-screen,
 unfogged, unoccluded) — the engine is omniscient, but truth for a pixel-based system
@@ -175,3 +174,86 @@ those metrics have nothing to score against, even with real recordings (which th
 **First step before building it:** answer the render-pass question in *Purpose & label
 strategy* — it decides whether the exporter emits segmentation masks (engine-side) or
 camera pose for harness-side projection.
+
+## Engine-fork dataset (contract for ENG-1 / ENG-2 / ENG-3)
+
+The `0A.DDataset` fork writes this layout. The loader in this repo is
+`src/zero_ad_eyes/infrastructure/data/engine_dataset.py` (`EngineDatasetRun`,
+`find_runs`), and its tests (`tests/test_data_engine_dataset.py`) build a synthetic run
+exactly as the fork must write it. If this section and the module disagree, the module
+wins.
+
+### Layout: one directory per run (one match)
+
+```
+<dataset-root>/<run_id>/
+    run.json                RunManifest (below)
+    rgb/<frame>.png         the frame as the player sees it, GUI on (ENG-2)
+    rgb_nogui/<frame>.png   optional: the same frame, GUI off (for the best.pt audit)
+    mask/<frame>.png        instance mask (encoding below) (ENG-1)
+    truth/<frame>.json      EngineFrameState for that frame (ENG-3)
+```
+
+- `<frame>` is the zero-padded capture index (`000000`, `000001`, …), and the same stem
+  names the frame in every folder.
+- A frame counts only when `rgb`, `mask` and `truth` all exist.
+- `run_id` is the per-process id the exporter already generates; it identifies the match.
+- **There are no train/val/test folders.** The split is made on ingest, by run (ENG-6).
+
+### `run.json` — `RunManifest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `run_id` | string | yes | Same as the directory name. |
+| `map_name` | string | yes | e.g. `skirmishes/acropolis_bay_2p`. |
+| `view_player` | int ≥ -1 | yes | Player whose view and HUD are rendered; `-1` = observer. |
+| `ally_players` | int[] | no | Allies of `view_player`. |
+| `width`, `height` | int > 0 | yes | Render resolution of every PNG. |
+| `map_size` | float > 0 \| null | no | World units per map side (for minimap truth). |
+| `mask_encoding` | string | yes | Must be `r-class_gb-instance/1`; the loader rejects anything else. |
+| `gui_in_rgb` | bool | no (default `true`) | Whether `rgb/` frames include the GUI. |
+| `engine_commit` | string \| null | no | Fork commit that produced the run. |
+
+### Mask encoding `r-class_gb-instance/1`
+
+8-bit RGB PNG, the same size as the RGB frame, **no anti-aliasing / MSAA** (every pixel
+is exact).
+
+- **R** = segmentation class id, the engine's `ESegmentationClass` value (0–16, table in
+  `src/zero_ad_eyes/infrastructure/model/segmentation_classes.py`).
+- **G·B** = per-frame **instance index**: `index = G * 256 + B`, 1–65535. Use 0 for
+  anything that isn't an entity (terrain, water, sky, unlabeled).
+- The index is a per-frame slot, not the engine entity id: entity ids can exceed 16 bits
+  in long matches. Each entity's `mask_index` in the truth JSON links the two.
+
+### `truth/<frame>.json` — `EngineFrameState`
+
+The per-frame schema above (`frame_id`, `timestamp`, `phase`, `resources`,
+`population_current`, `population_cap`, `entities`), plus:
+
+- **Frame level.** Top-level `phase` / `resources` / population are the **viewing
+  player's**, i.e. what the HUD shows. Use `timestamp` = simulation time in seconds.
+
+  | Field | Type | Notes |
+  |---|---|---|
+  | `players` | player[] | Every player: `player_id`, `civ`, `color` `{r,g,b}` 0–255, `phase`, `resources`, `population_current`, `population_cap`. |
+  | `camera` | object \| null | `x`, `y`, `z` (camera target, world), `rot_x` (pitch), `rot_y` (yaw) in radians, `zoom`. |
+
+- **Entity level.** Emit every entity in or near the view, including occluded ones; the
+  mask decides which get boxes. Leave `bbox` out: the loader computes it from the mask.
+
+  | Field | Type | Notes |
+  |---|---|---|
+  | `mask_index` | int 1–65535 \| null | Its instance index in this frame's mask; `null` if not drawn. |
+  | `template` | string \| null | Full template name, e.g. `units/athen/infantry_spearman_b`. |
+  | `visibility` | `visible` \| `fogged` \| `hidden` \| null | For the viewing player. |
+  | `world_z` | float \| null | Height (engine Y axis). |
+
+### How the loader labels a frame
+
+An entity gets a screen `bbox` (the tight box of its mask pixels) only when it covers at
+least `min_pixels` pixels and is not `hidden`. Entities without a box stay in the frame,
+so they still count for ownership, health and tracking, as in the rest of this contract.
+`EngineDatasetRun.to_export()` returns a normal `EngineStateExport`, so everything that
+consumes this contract (alignment, `evaluate`, the eval CLI) works on fork output
+unchanged.
