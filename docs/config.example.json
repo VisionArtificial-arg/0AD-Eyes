@@ -488,6 +488,9 @@
     "min_region_area": 16
   },
   "events": {
-    "entity": true
+    "entity": true,
+    "hud": true,
+    "hud_min_resource_delta": 1,
+    "hud_min_selection_health_delta": 0.01
   }
 }

@@ -543,6 +543,9 @@ class EventSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     entity: bool  # main-viewport entity transitions (thresholds live in ``tracking``)
+    hud: bool  # top bar + selection panel (EVT-3)
+    hud_min_resource_delta: int = Field(ge=1)  # smallest stockpile change reported
+    hud_min_selection_health_delta: float = Field(ge=0.0, le=1.0)
 
 
 class Config(BaseModel):

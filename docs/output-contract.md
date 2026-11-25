@@ -45,8 +45,39 @@ observe, each with a confidence, and the consumer decides what to ignore.
 | `screen_pos` | `{x, y}` \| null              | Full-capture pixels (an entity's box centre). |
 | `world_pos`  | `{x, y}` \| null              | World position; for a disappearance, where it was last seen. |
 
-The full catalogue of kinds and their `details` keys is documented as each event source
-lands (EVT-3…EVT-6).
+Sources run in a fixed order, so a recording always yields the same event list: HUD,
+then entity. Each can be switched off in the `events` config section. The catalogue
+below grows as each source lands (EVT-4…EVT-6 add minimap and system).
+
+#### HUD events (`origin: hud`)
+
+Read off the top bar and the selection panel. Confidence is the HUD read's. A value the
+HUD did not read this frame is not a change: the last known value is kept until it is
+read again.
+
+| `kind` | `details` |
+| --- | --- |
+| `resource_gained` / `resource_spent` | `resource`, `before`, `after`, `amount` (≥ `events.hud_min_resource_delta`) |
+| `population_changed` | `before`, `after`, `delta`, `cap` |
+| `population_cap_reached` | `current`, `cap` (population just reached the cap) |
+| `population_cap_raised` / `population_cap_lowered` | `before`, `after` |
+| `phase_changed` | `before`, `after` (`village` / `town` / `city`) |
+| `selection_changed` | `before`, `after`: selected entity type, `null` = nothing selected |
+| `selection_health_changed` | `entity_type`, `before`, `after` (≥ `events.hud_min_selection_health_delta`) |
+| `production_queue_changed` | `entity_type`, `before`, `after` (comma-joined), `length_before`, `length_after` |
+| `garrison_changed` | `entity_type`, `before`, `after` |
+
+Idle-worker counts and alert notifications are not read by any HUD reader yet, so they
+have no events.
+
+#### Entity events (`origin: entity`)
+
+| `kind` | `details` (beyond `entity_kind`, `ownership`, `entity_type`, `health`) |
+| --- | --- |
+| `unit_appeared` / `unit_disappeared` | none (a disappearance's position is where it was last seen) |
+| `combat` | `health_before`, `health_after` (drop > `tracking.combat_drop`) |
+| `resource_depleted` | none (health ≤ `tracking.depletion_health`) |
+| `state_changed` | `type_before`, `type_after` (e.g. scaffold → building) |
 
 Every perceived fact carries a `Confidence` (a bounded `[0, 1]` value plus a
 `Provenance` tag: `classical` / `learned` / `engine_gt` / `fused` / `unknown`), so a
