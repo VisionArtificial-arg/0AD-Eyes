@@ -46,8 +46,8 @@ observe, each with a confidence, and the consumer decides what to ignore.
 | `world_pos`  | `{x, y}` \| null              | World position; for a disappearance, where it was last seen. |
 
 Sources run in a fixed order, so a recording always yields the same event list: HUD,
-then entity. Each can be switched off in the `events` config section. The catalogue
-below grows as each source lands (EVT-4…EVT-6 add minimap and system).
+then minimap, then entity. Each can be switched off in the `events` config section. The catalogue
+below grows as each source lands (EVT-6 adds system events).
 
 #### HUD events (`origin: hud`)
 
@@ -69,6 +69,21 @@ read again.
 
 Idle-worker counts and alert notifications are not read by any HUD reader yet, so they
 have no events.
+
+#### Minimap events (`origin: minimap`)
+
+Positions are world coordinates from the minimap calibration. Blips have no identity,
+so a blip is "the same" as the nearest same-owner blip of the previous frame within
+`events.minimap_blip_match_radius`. Territory and camera compare with the last
+*reported* value, so slow changes still add up to an event.
+
+| `kind` | `details` / position |
+| --- | --- |
+| `blip_appeared` / `blip_vanished` | `ownership`; `world_pos` = the blip |
+| `enemy_in_territory` | `ownership`; `world_pos` = the enemy blip, once per entry. A region is approximated as a disc of its coverage |
+| `territory_gained` / `territory_lost` | `ownership`, `before`, `after` (map fraction; change ≥ `events.minimap_territory_min_change`) |
+| `area_explored` / `area_visible` / `area_fogged` | `cells`, mean `row`/`col` of the changed cells, `explored_fraction`. One event per kind per frame |
+| `camera_moved` | `dx`, `dy`, `distance`; `world_pos` = the new view centre (≥ `events.minimap_camera_move_min`) |
 
 #### Entity events (`origin: entity`)
 
