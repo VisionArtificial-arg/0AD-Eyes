@@ -307,5 +307,10 @@ def default_config() -> Config:
             score_threshold=0.0,  # model has no confidence gate; keep all argmax blobs
             min_region_area=16,  # drop pixel-speckle blobs (seg→entity denoise)
         ),
-        events=EventSettings(entity=True),
+        events=EventSettings(
+            entity=True,
+            hud=True,
+            hud_min_resource_delta=1,  # every observable change (events over silence)
+            hud_min_selection_health_delta=0.01,
+        ),
     )

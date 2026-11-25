@@ -179,9 +179,12 @@ def _build_pipeline(
 def _event_sources(cfg: Config) -> tuple[EventSource, ...]:
     """The enabled event sources, in the fixed order their events are emitted (EVT-2)."""
 
+    from zero_ad_eyes.infrastructure.hud.events import HudEventSource
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
 
     sources: list[EventSource] = []
+    if cfg.events.hud:
+        sources.append(HudEventSource.from_settings(cfg.events))
     if cfg.events.entity:
         sources.append(ClassicalEventDetector.from_settings(cfg.tracking))
     return tuple(sources)

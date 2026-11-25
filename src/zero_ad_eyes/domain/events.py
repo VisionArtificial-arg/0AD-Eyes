@@ -32,6 +32,18 @@ class EventKind(StrEnum):
     RESOURCE_DEPLETED = "resource_depleted"
     BUILDING_COMPLETED = "building_completed"
     STATE_CHANGED = "state_changed"
+    # HUD (v0.3, EVT-3)
+    RESOURCE_GAINED = "resource_gained"
+    RESOURCE_SPENT = "resource_spent"
+    POPULATION_CHANGED = "population_changed"
+    POPULATION_CAP_REACHED = "population_cap_reached"
+    POPULATION_CAP_RAISED = "population_cap_raised"
+    POPULATION_CAP_LOWERED = "population_cap_lowered"
+    PHASE_CHANGED = "phase_changed"
+    SELECTION_CHANGED = "selection_changed"
+    SELECTION_HEALTH_CHANGED = "selection_health_changed"
+    PRODUCTION_QUEUE_CHANGED = "production_queue_changed"
+    GARRISON_CHANGED = "garrison_changed"
 
 
 class EventOrigin(StrEnum):
