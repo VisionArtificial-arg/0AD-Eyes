@@ -22,7 +22,7 @@ Owners: **You** = the student, **Agent** = Claude Code running on the PC.
       W0 Spike      W1 Data factory  W2 Model v1     W3 Measured     W4 Fix & v2    W5 Frozen
       Nov 25–26     Nov 27–29        Nov 30–Dec 2    Dec 3–5         Dec 6–7        Dec 8–10
 L1    ENG-0         ENG-1,2,3,4      ENG-5,6         ──              ENG-5 more
-L2    MOD-0 ask     ──               MOD-1,2,3,4     (MOD-5)         MOD-6
+L2    ──            ──               MOD-1,2,3,4     (MOD-5)         MOD-6
 L3    ──            EVT-1,2,3        EVT-4,5,6       EVT-7           ──
 L4    CAP-1         CAP-2,3          EVAL-1,2        EVAL-3          EVAL-4, CAP-4
 L5    ──            ──               ──              ──              ──             PRES-1..4
@@ -45,7 +45,7 @@ L5    ──            ──               ──              ──         
 |---|---|---|---|---|---|
 | ENG-0 | Build the fork on the PC (distrobox) and run one autostart AI-vs-AI match with `-generate-dataset`. | Agent + You | W0 | one `rgb/` + `mask/` PNG pair on disk | ML2 |
 | ENG-1 | Instance masks: encode class + entity id in the mask colour so each entity has its own silhouette. | Agent | W1 | decoding a mask recovers per-entity masks whose ids match the game | E9, ML2 |
-| ENG-2 | Save the RGB frame with the GUI/HUD rendered, matching real play. | Agent | W1 | RGB shows HUD, minimap, health bars | ML2 |
+| ENG-2 | Save the RGB frame with the GUI/HUD rendered, matching real play. Keep a flag for GUI-off frames (used by MOD-1). | Agent | W1 | RGB shows HUD, minimap, health bars; the flag gives GUI-off frames | ML2 |
 | ENG-3 | Per-frame truth JSON next to each pair: entity id → template, owner, hp, position, visibility; player resources, population, phase; camera pose. | Agent | W1 | JSON validates against `infrastructure/data/ground_truth.py` (extend it if needed) | ML2, D6 |
 | ENG-4 | Linux match driver replacing `generate_dataset.ps1`: random map/civ/AI difficulty, fixed resolution, N matches unattended. | Agent | W1 | a run of 3 matches completes with no hand-holding | ML1, ML4 |
 | ENG-5 | Bulk generation overnight on the PC. | You | W2, W4 | ≥10k frames, ≥30 matches | ML4 |
@@ -56,8 +56,7 @@ L5    ──            ──               ──              ──         
 
 | ID | Story | Owner | Wave | Done when | Refs |
 |---|---|---|---|---|---|
-| MOD-0 | Ask the colleague for the dataset he already generated (`C:/Users/lruiz/Documents/My Games/0ad/dataset`). | You | W0 | data received, or a clear no | — |
-| MOD-1 | Audit `best.pt` on held-out matches: mIoU per class plus box precision/recall/mAP via connected components. | Agent | W2 | baseline row saved | — |
+| MOD-1 | Audit `best.pt` on **our** held-out matches, which it never saw: mIoU per class plus box precision/recall/mAP via connected components. Score it on GUI-on and GUI-off frames, because it was trained without the HUD. | Agent | W2 | baseline row saved | — |
 | MOD-2 | Training script for Kaggle/Colab: YOLO11-seg at imgsz 1280, exports weights + a sidecar with input size and class map. | Agent | W2 | runs end-to-end on a toy subset | ML6, ML7 |
 | MOD-3 | Train v1 on Kaggle/Colab (the PC's RX 5500 has no ROCm support). | You | W2 | weights + curves in the repo or a release | ML6 |
 | MOD-4 | `YoloSegPerceptionModel` adapter behind `PerceptionModel` with config + `--detector yolo`, plus parity tests. | Agent | W2 | `just validate` green | MP4, E1, E2, E8, E9 |
