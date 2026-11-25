@@ -580,6 +580,11 @@ class EventSettings(BaseModel):
     minimap_blip_match_radius: float = Field(gt=0.0)  # world units; same blip across frames
     minimap_camera_move_min: float = Field(ge=0.0)  # world units the view centre must move
     minimap_territory_min_change: float = Field(ge=0.0, le=1.0)  # fraction of the map
+    entity_state: bool  # view/fog, health recovery, motion, selection, spawns (EVT-5)
+    entity_heal_min: float = Field(ge=0.0, le=1.0)  # health rise reported as recovery
+    entity_move_min_speed: float = Field(ge=0.0)  # px/frame to count as moving
+    entity_stop_max_speed: float = Field(ge=0.0)  # px/frame to count as stopped (hysteresis)
+    entity_spawn_radius: float = Field(ge=0.0)  # px from an own building for a new unit
 
 
 class Config(BaseModel):

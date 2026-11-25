@@ -327,6 +327,11 @@ def default_config() -> Config:
             minimap_blip_match_radius=12.0,  # three tiles: a blip moving between frames
             minimap_camera_move_min=4.0,  # one tile
             minimap_territory_min_change=0.002,
+            entity_state=True,
+            entity_heal_min=0.02,
+            entity_move_min_speed=1.0,
+            entity_stop_max_speed=0.3,
+            entity_spawn_radius=40.0,
         ),
         dataset=DatasetSettings(
             val_fraction=0.15,

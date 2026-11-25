@@ -187,6 +187,7 @@ def _event_sources(cfg: Config) -> tuple[EventSource, ...]:
     from zero_ad_eyes.infrastructure.hud.events import HudEventSource
     from zero_ad_eyes.infrastructure.minimap.events import MinimapEventSource
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
+    from zero_ad_eyes.infrastructure.tracking.entity_events import EntityStateEventSource
 
     sources: list[EventSource] = []
     if cfg.events.hud:
@@ -195,6 +196,8 @@ def _event_sources(cfg: Config) -> tuple[EventSource, ...]:
         sources.append(MinimapEventSource.from_settings(cfg.events, cfg.minimap.world_extent))
     if cfg.events.entity:
         sources.append(ClassicalEventDetector.from_settings(cfg.tracking))
+    if cfg.events.entity_state:
+        sources.append(EntityStateEventSource.from_settings(cfg.events))
     return tuple(sources)
 
 
