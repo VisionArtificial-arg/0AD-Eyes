@@ -54,6 +54,18 @@ class EventKind(StrEnum):
     AREA_VISIBLE = "area_visible"
     AREA_FOGGED = "area_fogged"
     CAMERA_MOVED = "camera_moved"
+    # Entity state (v0.3, EVT-5)
+    ENTITY_LEFT_VIEW = "entity_left_view"
+    ENTITY_ENTERED_VIEW = "entity_entered_view"
+    ENTITY_HIDDEN = "entity_hidden"
+    ENTITY_REVEALED = "entity_revealed"
+    HEALTH_RECOVERED = "health_recovered"
+    STARTED_MOVING = "started_moving"
+    STOPPED_MOVING = "stopped_moving"
+    ENTITY_SELECTED = "entity_selected"
+    ENTITY_DESELECTED = "entity_deselected"
+    BUILDING_SEEN = "building_seen"
+    POSSIBLE_UNIT_TRAINED = "possible_unit_trained"
 
 
 class EventOrigin(StrEnum):

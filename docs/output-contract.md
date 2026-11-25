@@ -93,6 +93,16 @@ so a blip is "the same" as the nearest same-owner blip of the previous frame wit
 | `combat` | `health_before`, `health_after` (drop > `tracking.combat_drop`) |
 | `resource_depleted` | none (health ≤ `tracking.depletion_health`) |
 | `state_changed` | `type_before`, `type_after` (e.g. scaffold → building) |
+| `entity_left_view` / `entity_hidden` | `viewport_known`. Stopped being seen: outside the camera footprint, or lost inside it (fog, occlusion) |
+| `entity_entered_view` / `entity_revealed` | `frames_unseen` (seen again after leaving the view / after being hidden) |
+| `health_recovered` | `health_before`, `health_after` (rise ≥ `events.entity_heal_min`: repair, healing, construction) |
+| `started_moving` / `stopped_moving` | `speed` (px/frame), `dx`/`dy` on start; hysteresis between `events.entity_stop_max_speed` and `events.entity_move_min_speed` |
+| `entity_selected` / `entity_deselected` | none |
+| `building_seen` | none (any building appearing, including on the first frame) |
+| `possible_unit_trained` | `building_entity_id`, `building_type`, `distance_px`. A new own unit within `events.entity_spawn_radius` px of an own building; a guess, not emitted on the first frame |
+
+Construction progress and garrison counts are not on the entity contract, so they have
+no events; a building going up shows as `health_recovered`.
 
 Every perceived fact carries a `Confidence` (a bounded `[0, 1]` value plus a
 `Provenance` tag: `classical` / `learned` / `engine_gt` / `fused` / `unknown`), so a

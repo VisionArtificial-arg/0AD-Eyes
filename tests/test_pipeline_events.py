@@ -15,6 +15,7 @@ from zero_ad_eyes.infrastructure.hud.events import HudEventSource
 from zero_ad_eyes.infrastructure.minimap.events import MinimapEventSource
 from zero_ad_eyes.infrastructure.model import StubPerceptionModel
 from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
+from zero_ad_eyes.infrastructure.tracking.entity_events import EntityStateEventSource
 from zero_ad_eyes.interface.cli import _event_sources
 from zero_ad_eyes.interface.default_config import default_config
 
@@ -106,11 +107,12 @@ def test_entity_source_follows_its_config_switch() -> None:
         HudEventSource,
         MinimapEventSource,
         ClassicalEventDetector,
+        EntityStateEventSource,
     ]
     off = cfg.model_copy(
         update={
             "events": cfg.events.model_copy(
-                update={"entity": False, "hud": False, "minimap": False}
+                update={"entity": False, "hud": False, "minimap": False, "entity_state": False}
             )
         }
     )
