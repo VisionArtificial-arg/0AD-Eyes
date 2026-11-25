@@ -45,9 +45,9 @@ def test_run_over_image_folder_writes_v0_2_world_models_to_jsonl(
 
     assert code == 0
     captured = capsys.readouterr()
-    assert '"schema_version":"0.2.0"' not in captured.out
+    assert '"schema_version":"0.3.0"' not in captured.out
     assert "writing world models to" in captured.err
-    assert '"schema_version":"0.2.0"' in output.read_text(encoding="utf-8")
+    assert '"schema_version":"0.3.0"' in output.read_text(encoding="utf-8")
 
 
 def test_run_stdout_is_opt_in(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -63,8 +63,8 @@ def test_run_stdout_is_opt_in(tmp_path: Path, capsys: pytest.CaptureFixture[str]
 
     assert code == 0
     out = capsys.readouterr().out
-    assert '"schema_version":"0.2.0"' in out
-    assert '"schema_version":"0.2.0"' in output.read_text(encoding="utf-8")
+    assert '"schema_version":"0.3.0"' in out
+    assert '"schema_version":"0.3.0"' in output.read_text(encoding="utf-8")
 
 
 def test_run_without_frames_stops_cleanly_on_keyboard_interrupt(

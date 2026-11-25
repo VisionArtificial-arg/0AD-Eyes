@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from zero_ad_eyes.application.settings import TrackingSettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
-from zero_ad_eyes.domain.events import Event
+from zero_ad_eyes.domain.events import DetailValue, Event, EventOrigin
 from zero_ad_eyes.domain.events import EventKind as DomainEventKind
 from zero_ad_eyes.domain.taxonomy import EntityKind
 
@@ -49,7 +49,9 @@ class TrackingEvent(BaseModel):
     kind: EventKind
     entity_id: int = Field(ge=0)
     frame_id: int = Field(ge=0)
-    detail: str | None = None
+    detail: str | None = None  # human-readable debug aid
+    details: dict[str, DetailValue] = Field(default_factory=dict)  # typed payload (v0.3)
+    entity: Entity | None = None  # the entity as seen (previous frame's for a disappearance)
 
 
 class EventDetector:
@@ -105,6 +107,7 @@ class EventDetector:
                         current,
                         frame_id,
                         detail=f"{previous.health:.2f}->{current.health:.2f}",
+                        details={"health_before": previous.health, "health_after": current.health},
                     )
                 )
 
@@ -119,16 +122,30 @@ class EventDetector:
                     current,
                     frame_id,
                     detail=f"{previous.entity_type}->{current.entity_type}",
+                    details={
+                        "type_before": previous.entity_type,
+                        "type_after": current.entity_type,
+                    },
                 )
             )
         return events
 
     @staticmethod
     def _event(
-        kind: EventKind, entity: Entity, frame_id: int, *, detail: str | None = None
+        kind: EventKind,
+        entity: Entity,
+        frame_id: int,
+        *,
+        detail: str | None = None,
+        details: dict[str, DetailValue] | None = None,
     ) -> TrackingEvent:
         return TrackingEvent(
-            kind=kind, entity_id=entity.entity_id, frame_id=frame_id, detail=detail
+            kind=kind,
+            entity_id=entity.entity_id,
+            frame_id=frame_id,
+            detail=detail,
+            details=details or {},
+            entity=entity,
         )
 
 
@@ -147,8 +164,10 @@ class ClassicalEventDetector:
     The transition is inferred deterministically from the entity contract, so it is
     ``CLASSICAL``; its sureness inherits the current entity's confidence value where
     the entity is still present (appear/combat/state-change), and is taken as certain
-    for a disappearance (the id definitively left the tracked set). The infra event's
-    ``detail`` string is a debug aid and is dropped from the domain contract.
+    for a disappearance (the id definitively left the tracked set). Each domain event
+    has ``origin=entity``, the transition's typed ``details`` plus the entity's context
+    (kind, ownership, fine type, health), and the entity's screen/world position. The
+    infra ``detail`` string is a debug aid and stays out of the contract.
     """
 
     def __init__(self, detector: EventDetector) -> None:
@@ -166,12 +185,30 @@ class ClassicalEventDetector:
         for raw in self._detector.detect(entities, frame_id):
             source = by_id.get(raw.entity_id)
             value = source.confidence.value if source is not None else 1.0
+            seen = raw.entity
             events.append(
                 Event(
                     kind=_DOMAIN_KIND[raw.kind],
                     frame_id=raw.frame_id,
                     entity_id=raw.entity_id,
                     confidence=Confidence(value=value, provenance=Provenance.CLASSICAL),
+                    origin=EventOrigin.ENTITY,
+                    details={**_context(seen), **raw.details},
+                    screen_pos=seen.screen_bbox.center if seen and seen.screen_bbox else None,
+                    world_pos=seen.world_pos if seen else None,
                 )
             )
         return tuple(events)
+
+
+def _context(entity: Entity | None) -> dict[str, DetailValue]:
+    """What the consumer needs to read an entity event without the entity list."""
+
+    if entity is None:
+        return {}
+    return {
+        "entity_kind": entity.kind.value,
+        "ownership": entity.ownership.value,
+        "entity_type": entity.entity_type,
+        "health": entity.health,
+    }
