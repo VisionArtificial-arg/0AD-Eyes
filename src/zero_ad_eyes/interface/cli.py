@@ -66,7 +66,7 @@ def _offline_source(recording: str, acquisition: AcquisitionSettings) -> FrameSo
         )
     if path.with_suffix(".json").exists():
         return RecordedVideoSource(path)
-    return VideoFileSource(path)
+    return VideoFileSource(path, stride=acquisition.offline_video_stride)
 
 
 def _perception_model(detector: str, config: Config) -> PerceptionModel:

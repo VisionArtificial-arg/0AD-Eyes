@@ -64,6 +64,37 @@ Notes:
 - Live capture / HUD-OCR additionally need a display and the system `tesseract` binary
   (on Wayland, capture uses `grim`); offline `--recording` runs need neither.
 
+### Linux (Bazzite / KDE Wayland)
+
+Full PC setup, with a check per step: [`docs/pc-setup.md`](./docs/pc-setup.md).
+Bazzite is read-only, so 0 A.D. and OBS come from Flatpak, and `just` and `tesseract`
+from Homebrew.
+
+**Replay an OBS recording.** Any video OpenCV can decode replays on its own clock; it
+doesn't need the `--record` sidecar. OBS records at 30–60 fps, so use a stride to process
+every Nth frame:
+
+```bash
+ZAE_ACQUISITION__OFFLINE_VIDEO_STRIDE=10 \
+  uv run zero-ad-eyes run --recording recordings/match-01.mkv --output out.jsonl
+```
+
+`frame_id` keeps each frame's index in the video, so a strided run still lines up with
+an unstrided one.
+
+**Live capture of the game window** uses the `portal` backend (PipeWire screen cast;
+KDE shows a consent picker the first time):
+
+```bash
+uv run zero-ad-eyes run --live --config docs/config.linux-portal.json --record
+```
+
+The portal backend runs a helper under the system Python (`/usr/bin/python3`), which
+needs PyGObject and GStreamer's `pipewiresrc`; `docs/pc-setup.md` §3 checks both. The
+restore token goes to `calibration/` (gitignored), so later runs can skip the picker.
+`grim` (`capture_backend: wayland`) only works on wlroots compositors such as Sway or
+Hyprland, not KDE.
+
 ### Windows: capture just the game window
 
 The default backend (`mss`) grabs a whole monitor. To capture **only the 0 A.D.

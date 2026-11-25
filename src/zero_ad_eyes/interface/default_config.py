@@ -280,6 +280,7 @@ def default_config() -> Config:
         pipeline=PipelineSettings(recalibrate_interval=30),
         acquisition=AcquisitionSettings(
             offline_fps=30.0,
+            offline_video_stride=1,  # e.g. 10 on a 60 fps OBS recording → 6 frames/s
             image_extensions=(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"),
             live_monitor=1,
             live_fps=30.0,

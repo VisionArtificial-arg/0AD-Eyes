@@ -452,6 +452,7 @@
   },
   "acquisition": {
     "offline_fps": 30.0,
+    "offline_video_stride": 1,
     "image_extensions": [
       ".png",
       ".jpg",
