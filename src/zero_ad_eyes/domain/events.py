@@ -66,6 +66,17 @@ class EventKind(StrEnum):
     ENTITY_DESELECTED = "entity_deselected"
     BUILDING_SEEN = "building_seen"
     POSSIBLE_UNIT_TRAINED = "possible_unit_trained"
+    # System: the eyes about themselves (v0.3, EVT-6)
+    LAYOUT_DRIFT = "layout_drift"
+    RECALIBRATED = "recalibrated"
+    HUD_READ_FAILED = "hud_read_failed"
+    HUD_READ_RESTORED = "hud_read_restored"
+    HUD_LOW_CONFIDENCE = "hud_low_confidence"
+    MINIMAP_READ_FAILED = "minimap_read_failed"
+    MINIMAP_READ_RESTORED = "minimap_read_restored"
+    FRAMES_DROPPED = "frames_dropped"
+    DETECTIONS_STOPPED = "detections_stopped"
+    DETECTIONS_RESUMED = "detections_resumed"
 
 
 class EventOrigin(StrEnum):

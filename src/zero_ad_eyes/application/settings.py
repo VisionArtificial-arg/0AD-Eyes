@@ -585,6 +585,9 @@ class EventSettings(BaseModel):
     entity_move_min_speed: float = Field(ge=0.0)  # px/frame to count as moving
     entity_stop_max_speed: float = Field(ge=0.0)  # px/frame to count as stopped (hysteresis)
     entity_spawn_radius: float = Field(ge=0.0)  # px from an own building for a new unit
+    system: bool  # calibration, read failures, dropped frames, silent detector (EVT-6)
+    system_low_confidence: float = Field(ge=0.0, le=1.0)  # HUD read confidence below = low
+    system_silent_frames: int = Field(ge=1)  # frames with no detections = detector silent
 
 
 class Config(BaseModel):

@@ -184,12 +184,15 @@ def _build_pipeline(
 def _event_sources(cfg: Config) -> tuple[EventSource, ...]:
     """The enabled event sources, in the fixed order their events are emitted (EVT-2)."""
 
+    from zero_ad_eyes.infrastructure.contract.system_events import SystemEventSource
     from zero_ad_eyes.infrastructure.hud.events import HudEventSource
     from zero_ad_eyes.infrastructure.minimap.events import MinimapEventSource
     from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
     from zero_ad_eyes.infrastructure.tracking.entity_events import EntityStateEventSource
 
     sources: list[EventSource] = []
+    if cfg.events.system:
+        sources.append(SystemEventSource.from_settings(cfg.events))
     if cfg.events.hud:
         sources.append(HudEventSource.from_settings(cfg.events))
     if cfg.events.minimap:

@@ -332,6 +332,9 @@ def default_config() -> Config:
             entity_move_min_speed=1.0,
             entity_stop_max_speed=0.3,
             entity_spawn_radius=40.0,
+            system=True,
+            system_low_confidence=0.5,
+            system_silent_frames=30,  # ~2 s at 15 fps
         ),
         dataset=DatasetSettings(
             val_fraction=0.15,

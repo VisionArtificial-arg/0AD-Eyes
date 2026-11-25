@@ -11,6 +11,7 @@ from zero_ad_eyes.domain.calibration import Calibration, CalibrationCheck
 from zero_ad_eyes.domain.events import Event, EventKind, EventOrigin
 from zero_ad_eyes.domain.world_model import FrameMeta, WorldModel
 from zero_ad_eyes.infrastructure.acquisition import InMemoryFrameSource
+from zero_ad_eyes.infrastructure.contract.system_events import SystemEventSource
 from zero_ad_eyes.infrastructure.hud.events import HudEventSource
 from zero_ad_eyes.infrastructure.minimap.events import MinimapEventSource
 from zero_ad_eyes.infrastructure.model import StubPerceptionModel
@@ -104,6 +105,7 @@ def test_classical_event_detector_implements_the_port() -> None:
 def test_entity_source_follows_its_config_switch() -> None:
     cfg = default_config()
     assert [type(s) for s in _event_sources(cfg)] == [
+        SystemEventSource,
         HudEventSource,
         MinimapEventSource,
         ClassicalEventDetector,
@@ -112,7 +114,13 @@ def test_entity_source_follows_its_config_switch() -> None:
     off = cfg.model_copy(
         update={
             "events": cfg.events.model_copy(
-                update={"entity": False, "hud": False, "minimap": False, "entity_state": False}
+                update={
+                    "entity": False,
+                    "hud": False,
+                    "minimap": False,
+                    "entity_state": False,
+                    "system": False,
+                }
             )
         }
     )
