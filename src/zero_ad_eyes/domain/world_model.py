@@ -14,7 +14,7 @@ from .events import Event
 from .hud import HudState
 from .minimap import MinimapModel
 
-SCHEMA_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
 
 
 class FrameMeta(BaseModel):
@@ -39,4 +39,4 @@ class WorldModel(BaseModel):
     hud: HudState | None = None
     minimap: MinimapModel | None = None
     entities: tuple[Entity, ...] = ()
-    events: tuple[Event, ...] = ()  # v0.2: inter-frame transitions (EPIC G)
+    events: tuple[Event, ...] = ()  # v0.2: inter-frame transitions (EPIC G); v0.3 payload

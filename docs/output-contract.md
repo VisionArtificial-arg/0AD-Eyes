@@ -26,6 +26,27 @@ no pixels and no framework state (REQUIREMENTS.md §4):
 | `hud`            | `HudState \| None`         | Own-POV resources, population, phase, self-id (§4.2). |
 | `minimap`        | `MinimapModel \| None`     | Blips, viewport rectangle, confidence (§4.4).       |
 | `entities`       | `tuple[Entity, ...]`       | Per-entity kind, ownership, health, world position, `staleness`, confidence (§4.3). |
+| `events`         | `tuple[Event, ...]`        | Transitions since the previous frame (v0.2; payload v0.3, below). |
+
+### Events (v0.3)
+
+An event is something that *changed*: a unit appeared, health dropped, a resource ran
+out. The policy is **events over silence**: the eyes emit every transition they can
+observe, each with a confidence, and the consumer decides what to ignore.
+
+| Field        | Type                          | Meaning |
+| ------------ | ----------------------------- | ------- |
+| `kind`       | enum                          | What happened, e.g. `unit_appeared`, `combat`, `resource_depleted`, `state_changed`. |
+| `frame_id`   | int                           | Frame the transition was observed on. |
+| `entity_id`  | int \| null                   | Tracked entity it concerns, if any. |
+| `confidence` | `Confidence`                  | How sure the eyes are, plus provenance. |
+| `origin`     | `hud` \| `minimap` \| `entity` \| `system` \| `unknown` | Surface it was read from; `unknown` only from v0.2 producers. |
+| `details`    | map of str → scalar           | Typed payload, e.g. `health_before`/`health_after`, `type_before`/`type_after`, plus entity context (`entity_kind`, `ownership`, `entity_type`, `health`) for entity events. |
+| `screen_pos` | `{x, y}` \| null              | Full-capture pixels (an entity's box centre). |
+| `world_pos`  | `{x, y}` \| null              | World position; for a disappearance, where it was last seen. |
+
+The full catalogue of kinds and their `details` keys is documented as each event source
+lands (EVT-3…EVT-6).
 
 Every perceived fact carries a `Confidence` (a bounded `[0, 1]` value plus a
 `Provenance` tag: `classical` / `learned` / `engine_gt` / `fused` / `unknown`), so a

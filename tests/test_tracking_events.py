@@ -98,3 +98,59 @@ def test_classical_adapter_maps_to_domain_events() -> None:
 
     gone = adapter.detect((), frame_id=1)
     assert [e.kind for e in gone] == [DomainEventKind.UNIT_DISAPPEARED]
+
+
+def test_domain_events_carry_origin_details_and_position() -> None:
+    from zero_ad_eyes.domain.events import EventKind as DomainEventKind
+    from zero_ad_eyes.domain.events import EventOrigin
+    from zero_ad_eyes.domain.geometry import ScreenBBox, ScreenPoint, WorldPoint
+    from zero_ad_eyes.domain.taxonomy import Ownership
+    from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
+
+    def placed(health: float) -> Entity:
+        return _entity(3, health=health, entity_type="spearman").model_copy(
+            update={
+                "ownership": Ownership.ENEMY,
+                "screen_bbox": ScreenBBox(x=10, y=20, width=4, height=6),
+                "world_pos": WorldPoint(x=100.0, y=50.0),
+            }
+        )
+
+    adapter = ClassicalEventDetector(EventDetector(combat_drop=0.05, depletion_health=0.02))
+    adapter.detect((placed(1.0),), frame_id=0)
+    (combat,) = adapter.detect((placed(0.6),), frame_id=1)
+    assert combat.kind is DomainEventKind.COMBAT
+    assert combat.origin is EventOrigin.ENTITY
+    assert combat.details == {
+        "entity_kind": "unit",
+        "ownership": "enemy",
+        "entity_type": "spearman",
+        "health": 0.6,
+        "health_before": 1.0,
+        "health_after": 0.6,
+    }
+    assert combat.screen_pos == ScreenPoint(x=12.0, y=23.0)
+    assert combat.world_pos == WorldPoint(x=100.0, y=50.0)
+
+    (gone,) = adapter.detect((), frame_id=2)
+    assert gone.kind is DomainEventKind.UNIT_DISAPPEARED
+    assert gone.world_pos == WorldPoint(x=100.0, y=50.0)  # where it was last seen
+    assert gone.details["ownership"] == "enemy"
+
+
+def test_state_change_details_name_both_types() -> None:
+    from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
+
+    adapter = ClassicalEventDetector(EventDetector(combat_drop=0.05, depletion_health=0.02))
+    adapter.detect((_entity(0, entity_type="scaffold"),), frame_id=0)
+    (event,) = adapter.detect((_entity(0, entity_type="house"),), frame_id=1)
+    assert event.details["type_before"] == "scaffold"
+    assert event.details["type_after"] == "house"
+
+
+def test_v02_events_without_payload_still_validate() -> None:
+    from zero_ad_eyes.domain.events import Event, EventOrigin
+
+    event = Event.model_validate({"kind": "combat", "frame_id": 4, "entity_id": 1})
+    assert event.origin is EventOrigin.UNKNOWN
+    assert event.details == {} and event.screen_pos is None and event.world_pos is None
