@@ -436,34 +436,93 @@ def _run_eval(
 
 
 def _run_scorecard(
-    run_dir: str, *, detector: str, variant: str, output: str | None, config: Config
+    path: str,
+    *,
+    detector: str,
+    variant: str,
+    split: str,
+    seg_audit: bool,
+    output: str | None,
+    config: Config,
 ) -> int:
-    """`eval --engine-run`: replay an engine-fork run through the eyes and score it (EVAL-1).
+    """`eval --engine-run`: replay engine-fork runs through the eyes and score them.
 
-    Prints a readable summary and, with ``--output``, writes the full scorecard JSON.
-    It is a measurement, not a gate, so it always exits 0 once the run is scored.
+    ``path`` is one run dir or a dataset root of runs. ``split`` keeps only the runs the
+    dataset build assigns to that split (same seed), so a model is scored on matches it
+    never trained on. ``seg_audit`` adds the segmenter's mIoU (needs ``--detector
+    learned``). Prints a summary and, with ``--output``, writes the full JSON. It is a
+    measurement, not a gate: it exits 0 once scored, 1 when there is nothing to score.
     """
 
-    from zero_ad_eyes.infrastructure.data.engine_dataset import EngineDatasetRun, EngineRunSource
-    from zero_ad_eyes.infrastructure.data.scorecard import score_run
-
-    run = EngineDatasetRun.load(Path(run_dir))
-    observer = run.manifest.view_player < 0
-    export = run.to_export(self_player=1 if observer else None)
-    pipeline = _build_pipeline(
-        EngineRunSource(run, variant=variant), detector=detector, config=config
+    from zero_ad_eyes.infrastructure.data.engine_dataset import (
+        EngineDatasetRun,
+        EngineRunSource,
+        find_runs,
     )
-    card = score_run(
-        list(pipeline.run()),
-        export,
+    from zero_ad_eyes.infrastructure.data.scorecard import score_runs
+    from zero_ad_eyes.infrastructure.data.yolo_dataset import split_runs
+
+    root = Path(path)
+    runs = [EngineDatasetRun.load(root)] if (root / "run.json").is_file() else list(find_runs(root))
+    if split != "all":
+        assignment = split_runs(
+            [r.manifest.run_id for r in runs],
+            val_fraction=config.dataset.val_fraction,
+            test_fraction=config.dataset.test_fraction,
+            seed=config.dataset.split_seed,
+        )
+        runs = [r for r in runs if assignment[r.manifest.run_id] == split]
+    if not runs:
+        print(f"eval: no runs to score under {root} (split={split})", file=sys.stderr)
+        return 1
+    if seg_audit and detector != "learned":
+        print("eval: --seg-audit needs --detector learned", file=sys.stderr)
+        return 2
+
+    observer = any(r.manifest.view_player < 0 for r in runs)
+    scored = []
+    for run in runs:
+        export = run.to_export(self_player=1 if run.manifest.view_player < 0 else None)
+        pipeline = _build_pipeline(
+            EngineRunSource(run, variant=variant), detector=detector, config=config
+        )
+        scored.append((list(pipeline.run()), export))
+    card = score_runs(
+        scored,
         iou_threshold=config.thresholds.eval_iou_threshold,
         blip_radius=config.thresholds.eval_blip_match_radius,
     )
+    print(f"runs: {', '.join(r.manifest.run_id for r in runs)}  (split={split}, {variant})")
     print(_scorecard_summary(card, observer=observer))
+    result: dict[str, Any] = {"scorecard": card.model_dump(mode="json")}
+
+    if seg_audit:
+        from zero_ad_eyes.infrastructure.data.segmentation_audit import audit_segmentation
+        from zero_ad_eyes.infrastructure.model.segmentation_adapter import (
+            SegmentationPerceptionModel,
+        )
+
+        segmenter = SegmentationPerceptionModel.from_settings(config.segmentation)
+        audit = audit_segmentation(segmenter.segment, runs, variant=variant)
+        print(_segmentation_summary(audit))
+        result["segmentation"] = audit.model_dump(mode="json")
+
     if output is not None:
-        Path(output).write_text(card.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        Path(output).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(f"wrote {output}")
     return 0
+
+
+def _segmentation_summary(audit: Any) -> str:
+    def num(value: float | None) -> str:
+        return "unmeasured" if value is None else f"{value:.3f}"
+
+    lines = [
+        f"segmentation: mIoU {num(audit.miou)}  entity mIoU {num(audit.miou_entities)}  "
+        f"pixel acc {num(audit.pixel_accuracy)}  ({audit.frames} frames)"
+    ]
+    lines += [f"  {name:<16} IoU {value:.3f}" for name, value in audit.iou.items()]
+    return "\n".join(lines)
 
 
 def _scorecard_summary(card: Any, *, observer: bool) -> str:
@@ -473,7 +532,7 @@ def _scorecard_summary(card: Any, *, observer: bool) -> str:
     def num(value: float | None) -> str:
         return "unmeasured" if value is None else f"{value:.3f}"
 
-    lines = [f"frames scored: {card.frames}"]
+    lines = [f"runs scored: {card.runs}  frames scored: {card.frames}"]
     for name, det in (("coarse", card.detection_coarse), ("fine", card.detection_fine)):
         lines.append(f"detection ({name}): mAP50 {num(det.map50)}  mAP50-95 {num(det.map50_95)}")
         for cls, ap in det.ap50.items():
@@ -695,7 +754,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ev.add_argument(
         "--engine-run",
         default=None,
-        help="score the eyes on an engine-fork run dir (full scorecard, EVAL-1)",
+        help="score the eyes on an engine-fork run dir or a root of runs (EVAL-1)",
     )
     ev.add_argument(
         "--image-variant",
@@ -704,6 +763,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="--engine-run: replay the GUI-on (default) or GUI-off frames",
     )
     ev.add_argument("--output", default=None, help="--engine-run: write the scorecard JSON here")
+    ev.add_argument(
+        "--split",
+        choices=("all", "train", "val", "test"),
+        default="all",
+        help="--engine-run on a dataset root: score only the runs in this split",
+    )
+    ev.add_argument(
+        "--seg-audit",
+        action="store_true",
+        help="--engine-run: also score the U-Net class map as mIoU (needs --detector learned)",
+    )
     ev.add_argument(
         "--recording",
         default=None,
@@ -901,6 +971,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.engine_run,
             detector=args.detector,
             variant=args.image_variant,
+            split=args.split,
+            seg_audit=args.seg_audit,
             output=args.output,
             config=_load_config(args.config),
         )

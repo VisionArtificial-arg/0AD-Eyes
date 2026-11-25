@@ -15,7 +15,7 @@ from zero_ad_eyes.domain.taxonomy import Ownership
 from zero_ad_eyes.domain.world_model import FrameMeta, WorldModel
 from zero_ad_eyes.infrastructure.data.engine_dataset import EngineDatasetRun, EngineRunSource
 from zero_ad_eyes.infrastructure.data.ground_truth import EngineStateExport, GroundTruthAligner
-from zero_ad_eyes.infrastructure.data.scorecard import Scorecard, score_run
+from zero_ad_eyes.infrastructure.data.scorecard import Scorecard, score_run, score_runs
 from zero_ad_eyes.interface.cli import main
 
 from ._engine_fixtures import write_run
@@ -139,4 +139,55 @@ def test_cli_eval_engine_run_prints_and_writes_the_scorecard(
     assert main(["eval", "--engine-run", str(root), "--output", str(out)]) == 0
     printed = capsys.readouterr().out
     assert "frames scored: 2" in printed and "detection (coarse)" in printed
-    assert json.loads(out.read_text())["frames"] == 2
+    assert json.loads(out.read_text())["scorecard"]["frames"] == 2
+
+
+def test_runs_pool_without_frame_id_collisions(tmp_path: Path) -> None:
+    exports = [
+        EngineDatasetRun.load(write_run(tmp_path, run_id, frames=2)).to_export()
+        for run_id in ("run-a", "run-b")
+    ]
+    card = score_runs(
+        [(_perfect(export), export) for export in exports], iou_threshold=0.5, blip_radius=8.0
+    )
+    assert card.runs == 2 and card.frames == 4
+    assert card.detection_coarse.map50 == pytest.approx(1.0)
+    assert card.detection_coarse.truth_instances == {"building": 4, "unit": 4}
+    assert card.tracking_mota == pytest.approx(1.0)
+
+
+def test_cli_scores_a_root_and_filters_by_split(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for i in range(3):
+        write_run(tmp_path / "root", f"run{i}", frames=1)
+    assert main(["eval", "--engine-run", str(tmp_path / "root")]) == 0
+    assert "runs scored: 3" in capsys.readouterr().out
+    assert main(["eval", "--engine-run", str(tmp_path / "root"), "--split", "test"]) == 0
+    assert "runs scored: 1" in capsys.readouterr().out
+
+
+def test_cli_seg_audit_needs_the_learned_detector(tmp_path: Path) -> None:
+    root = write_run(tmp_path, frames=1)
+    assert main(["eval", "--engine-run", str(root), "--seg-audit"]) == 2
+
+
+def test_cli_seg_audit_scores_the_unet(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    pytest.importorskip("torch")
+    root = write_run(tmp_path, frames=1)
+    out = tmp_path / "audit.json"
+    code = main(
+        [
+            "eval",
+            "--engine-run",
+            str(root),
+            "--detector",
+            "learned",
+            "--seg-audit",
+            "--output",
+            str(out),
+        ]
+    )
+    assert code == 0
+    assert "segmentation: mIoU" in capsys.readouterr().out
+    assert json.loads(out.read_text())["segmentation"]["frames"] == 1

@@ -114,20 +114,37 @@ class SegmentationPerceptionModel:
         )
 
     def infer(self, frame: Frame, roi: ScreenBBox | None = None) -> Detections:
-        import torch
+        source_h, source_w = frame.image.shape[:2]
+        class_map, prob_map = self._predict(frame.image)
+        scale_x = source_w / self._input_w
+        scale_y = source_h / self._input_h
+        items = self._detections_from_mask(class_map, prob_map, scale_x, scale_y)
+        return Detections(frame_id=frame.meta.frame_id, items=tuple(items))
+
+    def segment(self, frame: Frame) -> np.ndarray:
+        """Per-pixel class ids at the frame's own resolution (uint8, nearest-upscaled).
+
+        The dense output behind ``infer``; offline audits score it as mIoU.
+        """
 
         source_h, source_w = frame.image.shape[:2]
-        tensor = self._to_input_tensor(frame.image)
+        class_map, _ = self._predict(frame.image)
+        return cv2.resize(
+            class_map.astype(np.uint8), (source_w, source_h), interpolation=cv2.INTER_NEAREST
+        )
+
+    def _predict(self, image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Argmax class map and its probability, at the model's input size."""
+
+        import torch
+
+        tensor = self._to_input_tensor(image_bgr)
         with torch.no_grad():
             logits = self._model(tensor)  # (1, C, h, w)
             probs = torch.softmax(logits, dim=1)[0]  # (C, h, w)
         class_map = probs.argmax(dim=0).cpu().numpy().astype(np.int32)
         prob_map = probs.max(dim=0).values.cpu().numpy()
-
-        scale_x = source_w / self._input_w
-        scale_y = source_h / self._input_h
-        items = self._detections_from_mask(class_map, prob_map, scale_x, scale_y)
-        return Detections(frame_id=frame.meta.frame_id, items=tuple(items))
+        return class_map, prob_map
 
     def _to_input_tensor(self, image_bgr: np.ndarray) -> torch.Tensor:
         import torch

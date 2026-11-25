@@ -96,3 +96,32 @@ uv run zero-ad-eyes dataset build --input <dataset-root> --output data/yolo
   classes (wood, stone, metal, food, fauna, building, unit).
 - **Settings:** all knobs are in the `dataset` config section.
   `dataset.image_variant: rgb_nogui` trains on the GUI-off frames instead.
+
+## Scoring the eyes on held-out runs (EVAL-1, MOD-1, EVAL-3)
+
+```bash
+# Full scorecard for the default detector on the held-out (test) runs:
+uv run zero-ad-eyes eval --engine-run <dataset-root> --split test --output card.json
+
+# The best.pt audit (MOD-1): boxes and tracking via the learned adapter, plus U-Net mIoU,
+# once on GUI-on frames and once on GUI-off frames (it was trained without the HUD):
+uv run --extra cpu zero-ad-eyes eval --engine-run <dataset-root> --split test \
+    --detector learned --seg-audit --output audit-gui.json
+uv run --extra cpu zero-ad-eyes eval --engine-run <dataset-root> --split test \
+    --detector learned --seg-audit --image-variant rgb_nogui --output audit-nogui.json
+```
+
+- **Same split everywhere.** `--split` uses the dataset build's assignment (same
+  `dataset.split_seed`), so every model is scored on the same matches and none of them
+  trained on those.
+- **The scorecard measures what a consumer receives:**
+  - detection AP50 / mAP50 / mAP50-95, both coarse (unit / building / resource node)
+    and per class (7 classes);
+  - HUD exact-match per field and mean relative error;
+  - ownership accuracy and health error;
+  - MOTA;
+  - minimap blip precision/recall;
+  - event counts per kind.
+- **`--seg-audit`** adds IoU per class, plain mIoU and **entity mIoU** (entity classes
+  only, since terrain inflates the plain number).
+- **Unmeasured metrics** print as `unmeasured`, never as a pass.

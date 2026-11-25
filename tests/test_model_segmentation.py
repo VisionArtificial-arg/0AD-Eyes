@@ -87,3 +87,19 @@ def test_from_weights_infers_learned_detections() -> None:
     for d in dets.items:
         assert d.confidence.provenance == Provenance.LEARNED
         assert 0.0 <= d.confidence.value <= 1.0
+
+
+def test_segment_returns_a_class_map_at_frame_resolution() -> None:
+    pytest.importorskip("torch")
+
+    from zero_ad_eyes.application.frames import Frame
+    from zero_ad_eyes.domain.world_model import FrameMeta
+
+    model = SegmentationPerceptionModel.from_weights()
+    frame = Frame(
+        image=np.zeros((90, 160, 3), dtype=np.uint8),
+        meta=FrameMeta(frame_id=0, timestamp=0.0, source="synthetic", width=160, height=90),
+    )
+    class_map = model.segment(frame)
+    assert class_map.shape == (90, 160) and class_map.dtype == np.uint8
+    assert int(class_map.max()) < 17
