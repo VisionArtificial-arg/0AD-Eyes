@@ -15,6 +15,7 @@ from .fixture_loader import FixtureFormatError, load_fixture_detections, load_fi
 from .parity import assert_satisfies_contract
 from .segmentation_adapter import SegmentationPerceptionModel
 from .stub_adapter import StubPerceptionModel
+from .yolo_adapter import YoloSegPerceptionModel
 
 __all__ = [
     "ContractViolation",
@@ -22,6 +23,7 @@ __all__ = [
     "ModelIOContract",
     "SegmentationPerceptionModel",
     "StubPerceptionModel",
+    "YoloSegPerceptionModel",
     "assert_satisfies_contract",
     "default_contract",
     "load_fixture_detections",
