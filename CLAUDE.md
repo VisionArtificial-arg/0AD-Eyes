@@ -44,7 +44,7 @@ gets updated in PRES-1.
 - **Laptop (NixOS):** coding only. Run tests there through a nix shell with `uv` and
   python312, setting `LD_LIBRARY_PATH` for libstdc++, libGL, glib, zlib and libxcb.
 
-## Sibling repos (`~/dev/va-final/` on the PC, org `VisionArtificial-arg`)
+## Sibling repos (next to this repo on the PC, see `docs/pc-setup.md`; org `VisionArtificial-arg`)
 
 - `0A.DDataset`: the engine fork that renders segmentation masks. It is the label factory
   (L1). Read `docs/engine-fork.md` before touching it or the dataset pipeline.
