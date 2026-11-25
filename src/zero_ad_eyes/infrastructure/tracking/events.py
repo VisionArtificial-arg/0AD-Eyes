@@ -23,12 +23,14 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.application.frames import PerceptionContext
 from zero_ad_eyes.application.settings import TrackingSettings
 from zero_ad_eyes.domain.confidence import Confidence, Provenance
 from zero_ad_eyes.domain.entities import Entity
 from zero_ad_eyes.domain.events import DetailValue, Event, EventOrigin
 from zero_ad_eyes.domain.events import EventKind as DomainEventKind
 from zero_ad_eyes.domain.taxonomy import EntityKind
+from zero_ad_eyes.domain.world_model import WorldModel
 
 
 class EventKind(StrEnum):
@@ -178,6 +180,11 @@ class ClassicalEventDetector:
         """Build from pure config (Approach B boundary mapping)."""
 
         return cls(EventDetector.from_settings(settings))
+
+    def events(self, world_model: WorldModel, context: PerceptionContext) -> tuple[Event, ...]:
+        """``EventSource`` port: entity transitions for this frame."""
+
+        return self.detect(world_model.entities, world_model.meta.frame_id)
 
     def detect(self, entities: Sequence[Entity], frame_id: int) -> tuple[Event, ...]:
         by_id = {entity.entity_id: entity for entity in entities}

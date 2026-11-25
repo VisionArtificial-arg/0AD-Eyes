@@ -20,6 +20,7 @@ from zero_ad_eyes.application.settings import (
     CalibrationSettings,
     Config,
     ConstructionCueSettings,
+    EventSettings,
     FogPalette,
     FogSettings,
     FractionalRegionSetting,
@@ -306,4 +307,5 @@ def default_config() -> Config:
             score_threshold=0.0,  # model has no confidence gate; keep all argmax blobs
             min_region_area=16,  # drop pixel-speckle blobs (seg→entity denoise)
         ),
+        events=EventSettings(entity=True),
     )

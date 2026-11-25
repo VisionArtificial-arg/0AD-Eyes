@@ -19,6 +19,7 @@ from typing import Any
 from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.application.pipeline import PerceptionPipeline
 from zero_ad_eyes.application.ports import (
+    EventSource,
     FrameSource,
     PerceptionModel,
     StageProfiler,
@@ -146,7 +147,6 @@ def _build_pipeline(
     from zero_ad_eyes.infrastructure.preprocessing.pipeline import PreprocessingPipeline
     from zero_ad_eyes.infrastructure.tracking import (
         ClassicalEntityFuser,
-        ClassicalEventDetector,
         IouTracker,
     )
 
@@ -170,10 +170,21 @@ def _build_pipeline(
         enricher=ClassicalEntityEnricher.from_settings(cfg.perception),
         projector=ViewportCameraProjector.from_settings(cfg.geometry),
         fuser=ClassicalEntityFuser.from_settings(cfg.geometry),
-        event_detector=ClassicalEventDetector.from_settings(cfg.tracking),
+        event_sources=_event_sources(cfg),
         sink=sink,
         profiler=profiler,
     )
+
+
+def _event_sources(cfg: Config) -> tuple[EventSource, ...]:
+    """The enabled event sources, in the fixed order their events are emitted (EVT-2)."""
+
+    from zero_ad_eyes.infrastructure.tracking import ClassicalEventDetector
+
+    sources: list[EventSource] = []
+    if cfg.events.entity:
+        sources.append(ClassicalEventDetector.from_settings(cfg.tracking))
+    return tuple(sources)
 
 
 def _build_offline_pipeline(

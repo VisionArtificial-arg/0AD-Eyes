@@ -26,3 +26,15 @@ class Frame:
     image: Any
     meta: FrameMeta
     crop_offset: tuple[int, int] = (0, 0)  # v0.2: (x, y) of this crop in the full capture
+
+
+@dataclass(frozen=True)
+class PerceptionContext:
+    """What the pipeline itself observed while perceiving one frame (EVT-2).
+
+    Event sources get this beside the world model: it carries facts that live in the
+    pipeline, not in the contract, so the system event source (EVT-6) can report them.
+    """
+
+    recalibrated: bool = False  # the HUD layout was (re-)detected on this frame
+    layout_drift: bool = False  # the periodic self-check found the layout had moved

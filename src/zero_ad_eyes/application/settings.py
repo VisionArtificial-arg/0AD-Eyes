@@ -535,6 +535,16 @@ class SegmentationModelSettings(BaseModel):
     min_region_area: int = Field(ge=0)
 
 
+class EventSettings(BaseModel):
+    """Which event sources run (EVT-2). Each source adds its switch and thresholds here
+    as it lands (EVT-3…EVT-6). Policy: events over silence, so every source defaults on
+    and thresholds stay recall-biased."""
+
+    model_config = ConfigDict(frozen=True)
+
+    entity: bool  # main-viewport entity transitions (thresholds live in ``tracking``)
+
+
 class Config(BaseModel):
     """The single, typed configuration root (X3). Built only from explicit values —
     see ``interface.default_config.default_config`` for the canonical default set."""
@@ -555,3 +565,4 @@ class Config(BaseModel):
     acquisition: AcquisitionSettings
     geometry: GeometrySettings
     segmentation: SegmentationModelSettings
+    events: EventSettings
