@@ -435,6 +435,63 @@ def _run_eval(
     return _print_report(report)
 
 
+def _run_scorecard(
+    run_dir: str, *, detector: str, variant: str, output: str | None, config: Config
+) -> int:
+    """`eval --engine-run`: replay an engine-fork run through the eyes and score it (EVAL-1).
+
+    Prints a readable summary and, with ``--output``, writes the full scorecard JSON.
+    It is a measurement, not a gate, so it always exits 0 once the run is scored.
+    """
+
+    from zero_ad_eyes.infrastructure.data.engine_dataset import EngineDatasetRun, EngineRunSource
+    from zero_ad_eyes.infrastructure.data.scorecard import score_run
+
+    run = EngineDatasetRun.load(Path(run_dir))
+    observer = run.manifest.view_player < 0
+    export = run.to_export(self_player=1 if observer else None)
+    pipeline = _build_pipeline(
+        EngineRunSource(run, variant=variant), detector=detector, config=config
+    )
+    card = score_run(
+        list(pipeline.run()),
+        export,
+        iou_threshold=config.thresholds.eval_iou_threshold,
+        blip_radius=config.thresholds.eval_blip_match_radius,
+    )
+    print(_scorecard_summary(card, observer=observer))
+    if output is not None:
+        Path(output).write_text(card.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        print(f"wrote {output}")
+    return 0
+
+
+def _scorecard_summary(card: Any, *, observer: bool) -> str:
+    def pct(rate: Any) -> str:
+        return "unmeasured" if rate.value is None else f"{rate.value:.1%} (n={rate.n})"
+
+    def num(value: float | None) -> str:
+        return "unmeasured" if value is None else f"{value:.3f}"
+
+    lines = [f"frames scored: {card.frames}"]
+    for name, det in (("coarse", card.detection_coarse), ("fine", card.detection_fine)):
+        lines.append(f"detection ({name}): mAP50 {num(det.map50)}  mAP50-95 {num(det.map50_95)}")
+        for cls, ap in det.ap50.items():
+            lines.append(f"  {cls:<16} AP50 {ap:.3f}  truth {det.truth_instances.get(cls, 0)}")
+    for name, rate in card.hud_exact.items():
+        lines.append(f"hud {name:<20} exact {pct(rate)}")
+    lines.append(f"hud mean relative error  {pct(card.hud_mean_relative_error)}")
+    note = "  (observer run: player 1 taken as self)" if observer else ""
+    lines.append(f"ownership accuracy       {pct(card.ownership_accuracy)}{note}")
+    lines.append(f"health MAE               {num(card.health_mae.value)} (n={card.health_mae.n})")
+    lines.append(f"tracking MOTA            {num(card.tracking_mota)}")
+    lines.append(f"minimap blip precision   {pct(card.minimap_blip_precision)}")
+    lines.append(f"minimap blip recall      {pct(card.minimap_blip_recall)}")
+    events = ", ".join(f"{k} {v}" for k, v in card.events_per_kind.items()) or "none"
+    lines.append(f"events: {events}")
+    return "\n".join(lines)
+
+
 def _run_bench(
     *,
     recording: str | None,
@@ -636,6 +693,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     ev = sub.add_parser("eval", help="run the ML8 accuracy harness (NF3 metrics)")
     ev.add_argument("--dataset", default=None, help="JSON with {predicted, truth} world models")
     ev.add_argument(
+        "--engine-run",
+        default=None,
+        help="score the eyes on an engine-fork run dir (full scorecard, EVAL-1)",
+    )
+    ev.add_argument(
+        "--image-variant",
+        choices=("rgb", "rgb_nogui"),
+        default="rgb",
+        help="--engine-run: replay the GUI-on (default) or GUI-off frames",
+    )
+    ev.add_argument("--output", default=None, help="--engine-run: write the scorecard JSON here")
+    ev.add_argument(
         "--recording",
         default=None,
         help="score a recording (image folder or video) end-to-end; needs --engine-export",
@@ -826,6 +895,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             for closer in closers:
                 closer.close()
         return 0
+
+    if args.command == "eval" and args.engine_run is not None:
+        return _run_scorecard(
+            args.engine_run,
+            detector=args.detector,
+            variant=args.image_variant,
+            output=args.output,
+            config=_load_config(args.config),
+        )
 
     if args.command == "eval":
         return _run_eval(

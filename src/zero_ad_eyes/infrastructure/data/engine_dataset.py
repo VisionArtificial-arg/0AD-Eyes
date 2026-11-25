@@ -27,6 +27,7 @@ WARNING — offline-only, like ``ground_truth``: never import this on the infere
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
@@ -35,7 +36,9 @@ import cv2
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from zero_ad_eyes.application.frames import Frame
 from zero_ad_eyes.domain.geometry import ScreenBBox
+from zero_ad_eyes.domain.world_model import FrameMeta
 
 from .ground_truth import EngineFrameState, EngineStateExport
 
@@ -65,6 +68,7 @@ class InstanceStats(NamedTuple):
 
     bbox: ScreenBBox
     pixels: int
+    class_id: int | None = None  # the mask's most common class there (if a class map was given)
 
 
 def encode_mask(class_map: np.ndarray, instance_map: np.ndarray) -> np.ndarray:
@@ -101,8 +105,10 @@ def read_mask(path: Path) -> np.ndarray:
     return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
 
-def instance_stats(instance_map: np.ndarray) -> dict[int, InstanceStats]:
-    """Tight screen box + pixel count for every non-zero instance index."""
+def instance_stats(
+    instance_map: np.ndarray, class_map: np.ndarray | None = None
+) -> dict[int, InstanceStats]:
+    """Tight screen box + pixel count (+ majority class) for every non-zero instance."""
 
     height, width = instance_map.shape
     flat = instance_map.ravel()
@@ -114,6 +120,13 @@ def instance_stats(instance_map: np.ndarray) -> dict[int, InstanceStats]:
     ids, positions = ids[order], positions[order]
     unique, starts, counts = np.unique(ids, return_index=True, return_counts=True)
     ys, xs = positions // width, positions % width
+    classes: list[int | None] = [None] * len(unique)
+    if class_map is not None:
+        flat_classes = class_map.ravel()[positions]
+        ends = np.append(starts[1:], len(positions))
+        classes = [
+            int(np.bincount(flat_classes[s:t]).argmax()) for s, t in zip(starts, ends, strict=True)
+        ]
     x0, x1 = np.minimum.reduceat(xs, starts), np.maximum.reduceat(xs, starts)
     y0, y1 = np.minimum.reduceat(ys, starts), np.maximum.reduceat(ys, starts)
     return {
@@ -125,6 +138,7 @@ def instance_stats(instance_map: np.ndarray) -> dict[int, InstanceStats]:
                 height=float(y1[i] - y0[i] + 1),
             ),
             pixels=int(counts[i]),
+            class_id=classes[i],
         )
         for i, index in enumerate(unique)
     }
@@ -186,8 +200,8 @@ class EngineDatasetRun:
         """
 
         truth = self.truth(frame)
-        _, instance_map = decode_mask(read_mask(frame.mask))
-        stats = instance_stats(instance_map)
+        class_map, instance_map = decode_mask(read_mask(frame.mask))
+        stats = instance_stats(instance_map, class_map)
         entities = []
         for entity in truth.entities:
             stat = stats.get(entity.mask_index) if entity.mask_index is not None else None
@@ -195,7 +209,12 @@ class EngineDatasetRun:
                 stat is not None and stat.pixels >= min_pixels and entity.visibility != "hidden"
             )
             entities.append(
-                entity.model_copy(update={"bbox": stat.bbox if visible and stat else None})
+                entity.model_copy(
+                    update={
+                        "bbox": stat.bbox if visible and stat else None,
+                        "seg_class": stat.class_id if stat else entity.seg_class,
+                    }
+                )
             )
         return truth.model_copy(update={"entities": tuple(entities)})
 
@@ -229,3 +248,37 @@ def find_runs(dataset_root: Path) -> tuple[EngineDatasetRun, ...]:
         EngineDatasetRun.load(manifest.parent)
         for manifest in sorted(dataset_root.glob("*/run.json"))
     )
+
+
+class EngineRunSource:
+    """``FrameSource`` over a run's frames, stamped with the truth's ids and clock.
+
+    Replaying a run through the pipeline this way makes every predicted world model
+    carry the same ``frame_id`` as its truth file, so scoring pairs them exactly.
+    ``variant="rgb_nogui"`` replays the GUI-off frames (where the run has them).
+    """
+
+    def __init__(self, run: EngineDatasetRun, *, variant: str = "rgb") -> None:
+        self._run = run
+        self._variant = variant
+
+    def frames(self) -> Iterator[Frame]:
+        for paths in self._run.frames():
+            image_path = paths.rgb_nogui if self._variant == "rgb_nogui" else paths.rgb
+            if image_path is None:
+                continue
+            image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+            if image is None:
+                continue
+            truth = self._run.truth(paths)
+            height, width = image.shape[:2]
+            yield Frame(
+                image=image,
+                meta=FrameMeta(
+                    frame_id=truth.frame_id,
+                    timestamp=truth.timestamp,
+                    source=self._run.manifest.run_id,
+                    width=width,
+                    height=height,
+                ),
+            )

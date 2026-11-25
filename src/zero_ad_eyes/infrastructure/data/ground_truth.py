@@ -90,6 +90,7 @@ class EngineEntityState(BaseModel):
     world_z: float | None = None  # terrain height at the entity (engine Y axis)
     visibility: Visibility | None = None  # for the viewing player
     mask_index: int | None = Field(default=None, ge=1, le=0xFFFF)  # instance index in the mask
+    seg_class: int | None = Field(default=None, ge=0)  # mask class there (set by the loader)
 
     def health_fraction(self) -> float | None:
         if self.health_max <= 0.0:
