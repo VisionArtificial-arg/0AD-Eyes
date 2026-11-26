@@ -122,6 +122,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--name", default="v1")
     p.add_argument("--device", default=None, help="e.g. 0, cpu (default: auto)")
     p.add_argument("--workers", type=int, default=4)
+    p.add_argument(
+        "--cache",
+        choices=("none", "ram", "disk"),
+        default="none",
+        help="cache decoded images; ram skips PNG decoding, the CPU bottleneck on Kaggle",
+    )
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--export", choices=("none", "onnx", "ncnn"), default="none")
     return p.parse_args(argv)
@@ -149,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         exist_ok=True,
         device=args.device,
         workers=args.workers,
+        cache=False if args.cache == "none" else args.cache,
         seed=args.seed,
         deterministic=True,
         plots=True,

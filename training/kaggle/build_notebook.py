@@ -4,7 +4,7 @@ The notebook embeds the script verbatim (a ``%%writefile`` cell), so the repo st
 single source and the notebook needs neither the 0AD-Eyes repo nor the package.
 
     python training/kaggle/build_notebook.py [--epochs N] [--model yolo11n-seg.pt] [--name v1]
-        [--batch 8] [--device 0,1]
+        [--batch 2] [--device 0] [--cache ram]
     kaggle kernels push -p training/kaggle --accelerator NvidiaTeslaT4
 
 The dataset (``santiagogarrote/zad-w1-yolo``) is attached through kernel-metadata.json
@@ -35,7 +35,7 @@ def cell(kind: str, source: str) -> dict:
     }
 
 
-def build(epochs: int, model: str, name: str, batch: int, device: str) -> dict:
+def build(epochs: int, model: str, name: str, batch: int, device: str, cache: str) -> dict:
     cells = [
         cell(
             "markdown",
@@ -76,7 +76,8 @@ print(DATA, sum(1 for _ in LOCAL.rglob("*.png")), "images")
             f"""
 CMD = (
     f"python train_yolo_seg.py --data {{DATA}} --model {model} --epochs {epochs} "
-    "--batch {batch} --device {device} --project /kaggle/working/runs --name {name} --workers 4"
+    "--batch {batch} --device {device} --cache {cache} --project /kaggle/working/runs "
+    "--name {name} --workers 4"
 )
 !{{CMD}}
 """,
@@ -112,12 +113,18 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--model", default="yolo11n-seg.pt")
     parser.add_argument("--name", default="v1")
-    parser.add_argument("--batch", type=int, default=8, help="total over all GPUs (default 8)")
-    parser.add_argument("--device", default="0,1", help="Kaggle's T4 option is 2 GPUs")
+    # One T4 at batch 2: dense frames (up to ~800 objects) made the mask loss run out of
+    # memory at batch 4 per GPU, and the CPU (PNG decoding, mosaics) is the bottleneck, so a
+    # second GPU added no speed. The RAM cache removes the decoding.
+    parser.add_argument("--batch", type=int, default=2, help="total over all GPUs (default 2)")
+    parser.add_argument("--device", default="0")
+    parser.add_argument("--cache", choices=("none", "ram", "disk"), default="ram")
     args = parser.parse_args()
     out = HERE / "mod3_train.ipynb"
     out.write_text(
-        json.dumps(build(args.epochs, args.model, args.name, args.batch, args.device), indent=1)
+        json.dumps(
+            build(args.epochs, args.model, args.name, args.batch, args.device, args.cache), indent=1
+        )
         + "\n"
     )
     print(f"wrote {out} ({args.model}, {args.epochs} epochs, run {args.name})")
