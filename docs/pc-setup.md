@@ -209,7 +209,29 @@ python3 tools/replay_recording/record_replays.py record  # about 10 min per game
 - **Language:** the game runs with `-conf=locale:en`, so its HUD matches the fork's
   training frames.
 
-## 9. Claude Code
+## 9. Where the data lives (private Kaggle datasets)
+
+Data is too big for git. It lives as private Kaggle datasets under `santiagogarrote`, so
+any machine, and any Kaggle notebook, can get it:
+
+| Dataset | What | Size |
+|---|---|---|
+| `santiagogarrote/zad-w1-yolo` | W1 YOLO-seg set from `zero-ad-eyes dataset build`: train/val/test split by match, 2,132 frames | 6.9 GB |
+| `santiagogarrote/zad-w1-raw` | the raw W1 runs: `rgb/`, `mask/`, `truth/`, `run.json`, driver report and logs | 13 GB |
+| `santiagogarrote/zad-real-play` | the 49 CAP-2 recordings, `LOG.md`, and the source replays with `SOURCES.tsv` | 6.2 GB |
+
+- **In a Kaggle notebook:** "Add data", then the dataset. It mounts at
+  `/kaggle/input/<name>/`.
+- **Elsewhere:** `kaggle datasets download santiagogarrote/<name> --unzip -p <dir>`.
+  The CLI needs an API token in `~/.kaggle/` (Kaggle > Settings > API).
+- **A new batch:** add `dataset-metadata.json` to its folder and run `kaggle datasets
+  create -p <dir> --dir-mode zip`. For a new version of an existing one, run `kaggle
+  datasets version -p <dir> -m "<what changed>" --dir-mode zip`.
+
+On the PC the CLI is at `$WS/tools/kaggle-env/bin/kaggle`, inside the box, with the
+token in `$WS/box-home/.kaggle/`.
+
+## 10. Claude Code
 
 Install Claude Code on the PC, then start it in `$WS/0AD-Eyes`. It picks up `CLAUDE.md`,
 which points to this file and to the roadmap in GitHub issues. `gh` lives in the box, so
