@@ -39,15 +39,14 @@ from typing import Any
 SIDECAR_FORMAT = "zero-ad-eyes/yolo-seg/1"
 
 
-def prepare_data_yaml(data_yaml: Path, out_dir: Path) -> Path:
-    """Copy ``data.yaml`` with ``path`` pointing at its own directory; return the copy."""
+def prepare_data_yaml(data_yaml: Path, fixed: Path) -> Path:
+    """Copy ``data.yaml`` to ``fixed`` with ``path`` pointing at the dataset; return it."""
 
     from ultralytics.utils import YAML
 
     spec = dict(YAML.load(str(data_yaml)))
     spec["path"] = str(data_yaml.resolve().parent)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    fixed = out_dir / "data.yaml"
+    fixed.parent.mkdir(parents=True, exist_ok=True)
     YAML.save(str(fixed), spec)
     return fixed
 
@@ -123,6 +122,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--name", default="v1")
     p.add_argument("--device", default=None, help="e.g. 0, cpu (default: auto)")
     p.add_argument("--workers", type=int, default=4)
+    p.add_argument(
+        "--cache",
+        choices=("none", "ram", "disk"),
+        default="none",
+        help="cache decoded images; ram skips PNG decoding, the CPU bottleneck on Kaggle",
+    )
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--export", choices=("none", "onnx", "ncnn"), default="none")
     return p.parse_args(argv)
@@ -133,7 +138,9 @@ def main(argv: list[str] | None = None) -> int:
     from ultralytics import YOLO
 
     run_dir = (args.project / args.name).resolve()
-    data = prepare_data_yaml(args.data, run_dir)
+    # Beside the run dir, not in it: multi-GPU (DDP) training recreates the run dir when it
+    # launches its workers, which deleted a data.yaml kept inside.
+    data = prepare_data_yaml(args.data, args.project.resolve() / f"{args.name}.data.yaml")
     batch = int(args.batch) if args.batch >= 1 else args.batch
 
     model = YOLO(args.model)
@@ -148,13 +155,16 @@ def main(argv: list[str] | None = None) -> int:
         exist_ok=True,
         device=args.device,
         workers=args.workers,
+        cache=False if args.cache == "none" else args.cache,
         seed=args.seed,
         deterministic=True,
         plots=True,
     )
     best = run_dir / "weights" / "best.pt"
     tuned = YOLO(str(best))
-    test = tuned.val(data=str(data), split="test", imgsz=args.imgsz, device=args.device, plots=True)
+    # Training may span GPUs ("0,1", DDP); validation runs on one.
+    val_device = args.device.split(",")[0] if args.device else None
+    test = tuned.val(data=str(data), split="test", imgsz=args.imgsz, device=val_device, plots=True)
     report_path = args.data.resolve().parent / "report.json"
     sidecar = write_sidecar(
         run_dir,

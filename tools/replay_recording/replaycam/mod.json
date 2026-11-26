@@ -1,0 +1,11 @@
+{
+	"name": "replaycam",
+	"version": "0.1.0",
+	"label": "0AD-Eyes replay camera",
+	"description": "Visual-replay camera director for recording real games with OBS (CAP-2). GUI only; does not change the simulation.",
+	"url": "https://github.com/VisionArtificial-arg/0AD-Eyes",
+	"ignoreInCompatibilityChecks": true,
+	"dependencies": [
+		"0ad=0.28.0"
+	]
+}

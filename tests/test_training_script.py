@@ -30,7 +30,8 @@ def test_data_yaml_path_is_rewritten_to_where_the_dataset_is(tmp_path: Path) -> 
         "path: /home/someone/else/yolo\ntrain: images/train\nval: images/val\n"
         "test: images/test\nnames:\n  0: resource_wood\n  6: unit\n"
     )
-    fixed = prepare_data_yaml(src / "data.yaml", tmp_path / "run")
+    fixed = prepare_data_yaml(src / "data.yaml", tmp_path / "runs" / "v1.data.yaml")
+    assert fixed == tmp_path / "runs" / "v1.data.yaml"
     assert str(src.resolve()) in fixed.read_text()
     assert class_names(fixed) == {0: "resource_wood", 6: "unit"}
 
