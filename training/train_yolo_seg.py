@@ -39,15 +39,14 @@ from typing import Any
 SIDECAR_FORMAT = "zero-ad-eyes/yolo-seg/1"
 
 
-def prepare_data_yaml(data_yaml: Path, out_dir: Path) -> Path:
-    """Copy ``data.yaml`` with ``path`` pointing at its own directory; return the copy."""
+def prepare_data_yaml(data_yaml: Path, fixed: Path) -> Path:
+    """Copy ``data.yaml`` to ``fixed`` with ``path`` pointing at the dataset; return it."""
 
     from ultralytics.utils import YAML
 
     spec = dict(YAML.load(str(data_yaml)))
     spec["path"] = str(data_yaml.resolve().parent)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    fixed = out_dir / "data.yaml"
+    fixed.parent.mkdir(parents=True, exist_ok=True)
     YAML.save(str(fixed), spec)
     return fixed
 
@@ -133,7 +132,9 @@ def main(argv: list[str] | None = None) -> int:
     from ultralytics import YOLO
 
     run_dir = (args.project / args.name).resolve()
-    data = prepare_data_yaml(args.data, run_dir)
+    # Beside the run dir, not in it: multi-GPU (DDP) training recreates the run dir when it
+    # launches its workers, which deleted a data.yaml kept inside.
+    data = prepare_data_yaml(args.data, args.project.resolve() / f"{args.name}.data.yaml")
     batch = int(args.batch) if args.batch >= 1 else args.batch
 
     model = YOLO(args.model)
