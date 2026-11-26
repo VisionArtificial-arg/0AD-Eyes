@@ -1,0 +1,15 @@
+{
+  "id": "santiagogarrote/zad-mod-3-yolo11-seg",
+  "title": "zad MOD-3 YOLO11-seg",
+  "code_file": "mod3_train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["santiagogarrote/zad-w1-yolo"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

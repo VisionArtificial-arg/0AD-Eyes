@@ -154,7 +154,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     best = run_dir / "weights" / "best.pt"
     tuned = YOLO(str(best))
-    test = tuned.val(data=str(data), split="test", imgsz=args.imgsz, device=args.device, plots=True)
+    # Training may span GPUs ("0,1", DDP); validation runs on one.
+    val_device = args.device.split(",")[0] if args.device else None
+    test = tuned.val(data=str(data), split="test", imgsz=args.imgsz, device=val_device, plots=True)
     report_path = args.data.resolve().parent / "report.json"
     sidecar = write_sidecar(
         run_dir,
