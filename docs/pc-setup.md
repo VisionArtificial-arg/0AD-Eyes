@@ -38,6 +38,15 @@ and the 0 A.D. user data dir all end up. Every command below runs inside the box
 
 **Check:** `distrobox enter zad -- bash -c 'echo $HOME'` prints `$WS/box-home`.
 
+**After a reboot** the box can refuse to start with `creating resolv.conf ... userdata/resolv.conf:
+no such file or directory`, then `cannot stat .../userdata/.containerenv`. The runroot
+under `/run/user` lost part of the container's state. Recreate it and start again:
+
+```bash
+U=/run/user/$(id -u)/ws-containers/overlay-containers/$(podman inspect -f '{{.Id}}' zad)/userdata
+mkdir -p $U && touch $U/.containerenv && podman start zad
+```
+
 ## 2. Tools, login and workspace layout
 
 ```bash
@@ -121,6 +130,8 @@ What each build failure looked like:
 
 The build needs about 15 GB free: 6.5 GB of art (twice, until `git lfs dedup` runs),
 about 3 GB for SpiderMonkey and the engine objects. It takes about 30 min on 16 threads.
+Once `build-source-libs.sh` has run, Rust is only needed to rebuild those libraries, so
+`rm -rf ~/.rustup ~/.cargo` frees 1.2 GB; rebuilding the engine itself doesn't use it.
 
 **Check:** `binaries/system/pyrogenesis` exists and opens the main menu with art.
 
@@ -142,7 +153,63 @@ about a missing `~/.local/share/0ad/mods` directory is harmless.
 (`$WS/box-home/.local/share/0ad/`), a `dataset/<split>/rgb/` and `mask/` PNG pair
 exists, and the mask shows flat class colours that line up with the RGB.
 
-## 8. Claude Code
+## 8. Real-play recordings from replays (CAP-2)
+
+The real-play test set is OBS footage of **real human games**, replayed from their
+replay files. They are public Release 28 (0.28.0) games: the
+[Spring 2026 tournament](https://wildfiregames.com/forum/topic/162666-spring-2026-tournament-replays/)
+1v1s and the [comp stomps](https://wildfiregames.com/forum/topic/141266-comp-stomps-release-28/)
+thread (humans vs Petra). A replay only re-simulates on the version it was played on, so
+they run in the official 0.28.0 AppImage, not in the fork (0.29.0-dev).
+
+Everything lives in `$WS/0ad-r28` (host, no box needed):
+
+```bash
+cd $WS/0ad-r28
+curl -LO https://releases.wildfiregames.com/0ad-0.28.0-x86_64.AppImage \
+     -LO https://releases.wildfiregames.com/0ad-0.28.0-x86_64.AppImage.sha256sum
+sha256sum -c *.sha256sum && chmod +x 0ad-0.28.0-x86_64.AppImage
+# replays-src/<name>/commands.txt (+ metadata.json): unzip the forum attachments here;
+# replays-src/SOURCES.tsv lists where each one came from.
+# Mainland Balanced games need the feldmap 3.0.1 mod (feldmap.zip in the feldmap forum
+# thread), unzipped to home/data/0ad/mods/feldmap/.
+```
+
+`tools/replay_recording/record_replays.py` drives everything, stdlib only:
+- It runs the AppImage with its own XDG dirs under `$WS/0ad-r28/home`, so a personal
+  0 A.D. install is untouched.
+- It loads the `replaycam` GUI mod, which takes the human player's perspective (their
+  fog, HUD and panels) and moves the camera like the fork's director. It
+  fast-forwards between segments and prints markers.
+- On each marker it starts or stops OBS over its websocket. Each segment becomes
+  `recordings/<replay>_p<player>_s<n>.mkv`, plus a row in `recordings/LOG.md`.
+
+```bash
+python3 tools/replay_recording/record_replays.py setup   # once: websocket config, OBS, screen source
+python3 tools/replay_recording/record_replays.py plan    # 2 x 3 min per game by default
+python3 tools/replay_recording/record_replays.py record  # about 10 min per game; leave the PC alone
+```
+
+- **Setup:** in the portal dialog that `setup` opens, share the **entire screen, not a
+  window**. Each replay opens a new game window, so a window capture freezes on the
+  last frame once its window closes. The recorder stops if the picture doesn't change
+  during a segment. If the dialog doesn't show, it is probably behind a fullscreen game
+  (Alt+Tab). Otherwise use OBS > Screen > Reload.
+- **Bitrate:** the OBS profile records at **6 Mbps VBR**
+  (`recordEncoder.json`: `{"rate_control":"VBR","bitrate":6000,"maxrate":9000,...}`),
+  about 135 MB per 3-minute segment. That's a normal 1080p30 stream rate. CQP 16 looked
+  fine on a quiet screen but reached 30–90 Mbps in busy late games, and 19 games filled
+  the disk. `tools/replay_recording/shrink_recordings.sh` re-encodes old CQP files (in
+  the box, `sudo dnf install ffmpeg-free`). It uses CPU `libopenh264`, because Fedora's
+  Mesa has no H.264 VAAPI encoding.
+- **OBS crash prompt:** killing OBS (`flatpak kill`) leaves `run_*` files in
+  `~/.var/app/com.obsproject.Studio/config/obs-studio/.sentinel/`. The next start then
+  waits on a "crash detected, safe mode?" prompt with the websocket off. The recorder
+  deletes them before starting OBS. OBS 33 ignores `--disable-shutdown-check`.
+- **Language:** the game runs with `-conf=locale:en`, so its HUD matches the fork's
+  training frames.
+
+## 9. Claude Code
 
 Install Claude Code on the PC, then start it in `$WS/0AD-Eyes`. It picks up `CLAUDE.md`,
 which points to this file and to the roadmap in GitHub issues. `gh` lives in the box, so
